@@ -5,15 +5,17 @@ from src.utils import connection_to_str, max_connection, word_to_bytes_list, mer
 
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
+Connection = tuple[bytes, bytes]
+Index = int
 
 
 def bpe_train(
         input_path: str,
         vocab_size: int,
         special_tokens: list[str]
-) -> tuple[dict[int, bytes], list[tuple[bytes, bytes]]]:
+) -> tuple[dict[int, bytes], list[Connection]]:
     vocab = Vocab()
-    merge_rules: list[tuple[bytes, bytes]] = []
+    merge_rules: list[Connection] = []
 
     for i in range(0,256):
         vocab.put(bytes([i]))
@@ -50,7 +52,7 @@ def bpe_train(
     while len(vocab) < vocab_size:
         idx += 1
         # calculate connections
-        connections = {}
+        connections: dict[Connection, int] = {}
         for i in range(len(all_bytes)):
             bytes_list: list[bytes] = all_bytes[i][0]
             nums: int = all_bytes[i][1]
@@ -63,7 +65,7 @@ def bpe_train(
             if new_bytes_list is None:
                 new_bytes_list = bytes_list
             for j in range(1, len(new_bytes_list)):
-                connection: tuple[bytes,bytes] = (new_bytes_list[j-1], new_bytes_list[j])
+                connection: Connection = (new_bytes_list[j-1], new_bytes_list[j])
                 if connection not in connections:
                     connections[connection] = nums
                 else:
@@ -91,7 +93,7 @@ def bpe_train(
         #         print(sum(x[0] for x in value))
 
         # find best connection
-        best_connections: list[tuple[bytes,bytes]] = []
+        best_connections: list[Connection] = []
         max_nums = 0
         for connection, nums in connections.items():
             if nums > max_nums:
@@ -114,8 +116,8 @@ def bpe_train(
     return vocab.build_dict(), merge_rules
 
 
-# _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["[<|endoftext|>"])
-# print(merge)
+_, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["[<|endoftext|>"])
+print(merge)
 
 # sorted_words = sorted(all_words.items(), key=lambda x: x[1], reverse=True)
 # print(sorted_words[:10])
