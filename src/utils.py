@@ -1,3 +1,6 @@
+from src.type_define import Connection
+
+
 def connection_to_str(tp: tuple[bytes, bytes]) -> str:
     return "(" + tp[0].decode("utf-8") + ", " + tp[1].decode("utf-8") + ")"
 
@@ -54,3 +57,9 @@ def merge_by_one_rule(bytes_list: list[bytes], merge_rule: tuple[bytes, bytes]) 
         merge_result.append(bytes_list[-1])
 
     return merge_result if merged else None
+
+def bytes_list_to_connections(bytes_list: list[bytes]) -> list[Connection]:
+    result: list[Connection] = []
+    for i in range(1, len(bytes_list)):
+        result.append((bytes_list[i-1], bytes_list[i]))
+    return result

@@ -1,13 +1,11 @@
 import regex as re
 
 from src.Vocab import Vocab
-from src.utils import connection_to_str, max_connection, word_to_bytes_list, merge_once, merge_by_one_rule
+from src.type_define import Index, Connection, Num
+from src.utils import connection_to_str, max_connection, word_to_bytes_list, merge_once, merge_by_one_rule, \
+    bytes_list_to_connections
 
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-
-Connection = tuple[bytes, bytes]
-Index = int
-Nums = int
 
 
 def bpe_train(
@@ -50,14 +48,15 @@ def bpe_train(
     for word, nums in all_words.items():
         all_bytes.append((word_to_bytes_list(word), nums))
 
+    last_contributors_index: list[Index] = []
+    connections_num_map: dict[Connection,Num] = {}
+    connections_contrib_map: dict[Connection,set[Index]] = {}
     while len(vocab) < vocab_size:
         idx += 1
         # calculate connections
-        # Connection -> (nums, contributor's index in all_bytes
-        # connections_map: dict[Connection, tuple[Nums, list[Index]]] = {}
-        connections_num_map: dict[Connection,Nums] = {}
-        connections_contrib_map: dict[Connection,list[Index]] = {}
-        for i in range(len(all_bytes)):
+        if last_contributors_index == []:
+            last_contributors_index = list(range(len(all_bytes)))
+        for i in last_contributors_index:
             bytes_list: list[bytes] = all_bytes[i][0]
             nums: int = all_bytes[i][1]
             # 根据最新的一条合并规则进行合并
@@ -68,13 +67,24 @@ def bpe_train(
                 new_bytes_list = bytes_list
             if new_bytes_list is None:
                 new_bytes_list = bytes_list
-            for j in range(1, len(new_bytes_list)):
-                connection: Connection = (new_bytes_list[j-1], new_bytes_list[j])
+            # 旧的connection需要从统计中清除
+            if len(merge_rules) > 0:
+                old_connections = bytes_list_to_connections(bytes_list)
+                for connection in old_connections:
+                    if connection in connections_num_map:
+                        connections_num_map[connection] -= nums
+                        # if i not in connections_contrib_map[connection]:
+                        #     print("????")
+                        if i in connections_contrib_map[connection]:
+                            connections_contrib_map[connection].remove(i)
+            # 然后新的connection加入统计
+            new_connections = bytes_list_to_connections(new_bytes_list)
+            for connection in new_connections:
                 if connection not in connections_num_map:
                     connections_num_map[connection] = 0
-                    connections_contrib_map[connection] = []
+                    connections_contrib_map[connection] = set()
                 connections_num_map[connection] += nums
-                connections_contrib_map[connection].append(i)
+                connections_contrib_map[connection].add(i)
             all_bytes[i] = (new_bytes_list, nums)
         # if idx == 21:
         #     # 计算完成 connections 后，先看三对的计数
@@ -98,19 +108,21 @@ def bpe_train(
         #         print(sum(x[0] for x in value))
 
         # find best connection
-        best_connections: list[tuple[Connection, list[Index]]] = []
+        best_connections: list[tuple[Connection, set[Index]]] = []
         max_nums = 0
         for connection, nums in connections_num_map.items():
-            contributors_index: list[Index] = connections_contrib_map[connection]
+            contributors_index: set[Index] = connections_contrib_map[connection]
             if nums > max_nums:
                 best_connections = [(connection, contributors_index)]
                 max_nums = nums
-                best_contributors_index = contributors_index
             elif nums == max_nums:
                 best_connections.append((connection, contributors_index))
         # if len(best_connections) > 1 or max(best_connections) == (b'e', b'n'):
         #     print(best_connections, max_nums)
         best_connection = max(best_connections)
+        last_contributors_index = list(best_connection[1])
+        # connections_num_map.pop(best_connection[0])
+        # connections_contrib_map.pop(best_connection[0])
         # print(connection_to_str(best_connection), max_nums)
         print(idx)
         merge_rules.append(best_connection[0])
@@ -122,6 +134,7 @@ def bpe_train(
     return vocab.build_dict(), merge_rules
 
 
+# _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/bpe_example.txt", 270, ["[<|endoftext|>"])
 _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["[<|endoftext|>"])
 print(merge)
 
