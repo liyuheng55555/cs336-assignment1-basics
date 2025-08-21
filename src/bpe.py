@@ -1,5 +1,6 @@
 import logging
 from multiprocessing import Process, Queue
+from time import perf_counter
 
 import regex as re
 
@@ -70,19 +71,16 @@ def pre_tokenize_worker(queue: Queue, chunk: str, special_tokens: list[str]):
     pattern = "|".join(re.escape(token) for token in special_tokens)
     contents = [c for c in re.split(pattern, chunk) if c]
 
-    logging.info(f"特殊符号切分完成, 共{len(contents)}段", )
+    print(f"特殊符号切分完成, 共{len(contents)}段", )
 
-    all_words : dict[TokenList, int] = {} # "xxx" -> nums
+    all_words : dict[bytes, int] = {} # "xxx" -> nums
     for content in contents:
         for match in re.finditer(PAT, content):
             word = match.group()
             byte = word.encode("utf-8")
-            if byte not in all_words:
-                all_words[bytes_to_bytes_list(byte)] = 1
-            else:
-                all_words[bytes_to_bytes_list(byte)] += 1
+            all_words[byte] = all_words.get(byte, 0) + 1
 
-    logging.info(f"正则解析完成")
+    print(f"正则解析完成")
 
     queue.put(all_words)
 
@@ -92,24 +90,29 @@ def pre_tokenize(input_path: str, special_tokens: list[str]) -> list[tuple[Token
     workers: list[Process] = []
     with open(input_path, "rb") as f:
         # raw_content = f.read().decode("utf-8", errors="ignore")
-        boundaries = find_chunk_boundaries(f, 4, list(token.encode("utf-8") for token in special_tokens))
+        boundaries = find_chunk_boundaries(f, 6, list(token.encode("utf-8") for token in special_tokens))
         for start, end in zip(boundaries[:-1], boundaries[1:]):
+            logging.info(f"start {start} to {end}")
             f.seek(start)
             chunk = f.read(end - start).decode("utf-8", errors="ignore")
-            process = Process(target=pre_tokenize_worker, args=("queue", "chunk", "special_tokens",))
+            process = Process(target=pre_tokenize_worker, args=(queue, chunk, special_tokens))
             workers.append(process)
             process.start()
+
+    logging.info("子进程提交完毕")
+
+    merged_result: dict[bytes, Num] = {}
+    for _ in workers:
+        d: dict[bytes, int] = queue.get()
+        for k,v in d.items():
+            merged_result[k] = merged_result.get(k, 0) + v
 
     for worker in workers:
         worker.join()
 
-    merged_result: dict[TokenList, Num] = {}
-    while not queue.empty():
-        d = queue.get()
-        for k,v,in d.items():
-            merged_result[k] = merged_result.get(k, 0) + v
+    logging.info("结果汇总完毕")
 
-    return list(merged_result.items())
+    return list((bytes_to_bytes_list(k), v) for k, v in merged_result.items())
 
 
 def bpe_train(
@@ -150,17 +153,21 @@ def bpe_train(
         # update vocab
         vocab.put(best_connection[0] + best_connection[1])
 
-        print(idx)
+        # print(idx)
 
     print("============\n\n")
 
     return vocab.build_dict(), merge_rules
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-_, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/bpe_example.txt", 270, ["[<|endoftext|>"])
-# _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["[<|endoftext|>"])
-# _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt", 512, ["[<|endoftext|>"])
-print(merge)
+    start = perf_counter()
+    # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/bpe_example.txt", 270, ["<|endoftext|>"])
+    # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["<|endoftext|>"])
+    _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt", 10000, ["<|endoftext|>"])
+    print(merge)
+    end = perf_counter()
+    print(f"总耗时: {end - start:.6f} 秒")
 
 
