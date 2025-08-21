@@ -16,7 +16,7 @@ def max_connection(connections: list[tuple[bytes,bytes]]) -> tuple[bytes,bytes]:
 #         else:
 #             bytes_list = merged_bytes_list
 
-def word_to_bytes_list(word: bytes) -> list[bytes]:
+def bytes_to_bytes_list(word: bytes) -> list[bytes]:
     return list(bytes([x]) for x in word)
 
 def merge_once(bytes_list: list[bytes], merge_rules: list[tuple[bytes,bytes]]) -> list[bytes] | None:

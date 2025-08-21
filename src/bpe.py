@@ -1,10 +1,12 @@
 import logging
+from multiprocessing import Process, Queue
 
 import regex as re
 
+from cs336_basics.pretokenization_example import find_chunk_boundaries
 from src.Vocab import Vocab
-from src.type_define import Index, Connection, Num
-from src.utils import connection_to_str, max_connection, word_to_bytes_list, merge_once, merge_by_one_rule, \
+from src.type_define import Index, Connection, Num, TokenList
+from src.utils import bytes_to_bytes_list, merge_by_one_rule, \
     bytes_list_to_connections
 
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
@@ -26,7 +28,7 @@ def find_best_connection(
     return max(best_connections)
 
 def update(
-        all_bytes: list[tuple[list[bytes], int]],
+        all_bytes: list[tuple[TokenList, int]],
         last_contributors_index: list[Index],
         connections_num_map: dict[Connection,Num],
     connections_contrib_map: dict[Connection,set[Index]],
@@ -35,10 +37,10 @@ def update(
     if last_contributors_index == []:
         last_contributors_index = list(range(len(all_bytes)))
     for i in last_contributors_index:
-        bytes_list: list[bytes] = all_bytes[i][0]
+        bytes_list: TokenList = all_bytes[i][0]
         nums: int = all_bytes[i][1]
         # 根据最新的一条合并规则进行合并
-        new_bytes_list: list[bytes]
+        new_bytes_list: TokenList
         if merge_rule is not None:
             new_bytes_list = merge_by_one_rule(bytes_list,merge_rule)
         else:
@@ -64,34 +66,50 @@ def update(
         all_bytes[i] = (new_bytes_list, nums)
 
 
-def pre_tokenize(input_path: str, special_tokens: list[str]) -> list[tuple[list[bytes], int]]:
-    with open(input_path, "rb") as f:
-        raw_content = f.read().decode("utf-8", errors="ignore")
-
+def pre_tokenize_worker(queue: Queue, chunk: str, special_tokens: list[str]):
     pattern = "|".join(re.escape(token) for token in special_tokens)
-    contents = [c for c in re.split(pattern, raw_content) if c]
+    contents = [c for c in re.split(pattern, chunk) if c]
 
     logging.info(f"特殊符号切分完成, 共{len(contents)}段", )
 
-    all_words : dict[bytes, int] = {} # "xxx" -> nums
+    all_words : dict[TokenList, int] = {} # "xxx" -> nums
     for content in contents:
         for match in re.finditer(PAT, content):
             word = match.group()
             byte = word.encode("utf-8")
             if byte not in all_words:
-                all_words[byte] = 1
+                all_words[bytes_to_bytes_list(byte)] = 1
             else:
-                all_words[byte] += 1
+                all_words[bytes_to_bytes_list(byte)] += 1
 
     logging.info(f"正则解析完成")
 
-    all_bytes: list[tuple[list[bytes], int]] = []
-    for word, nums in all_words.items():
-        all_bytes.append((word_to_bytes_list(word), nums))
+    queue.put(all_words)
 
-    logging.info(f"预分词完成")
 
-    return all_bytes
+def pre_tokenize(input_path: str, special_tokens: list[str]) -> list[tuple[TokenList, Num]]:
+    queue: Queue = Queue()
+    workers: list[Process] = []
+    with open(input_path, "rb") as f:
+        # raw_content = f.read().decode("utf-8", errors="ignore")
+        boundaries = find_chunk_boundaries(f, 4, list(token.encode("utf-8") for token in special_tokens))
+        for start, end in zip(boundaries[:-1], boundaries[1:]):
+            f.seek(start)
+            chunk = f.read(end - start).decode("utf-8", errors="ignore")
+            process = Process(target=pre_tokenize_worker, args=("queue", "chunk", "special_tokens",))
+            workers.append(process)
+            process.start()
+
+    for worker in workers:
+        worker.join()
+
+    merged_result: dict[TokenList, Num] = {}
+    while not queue.empty():
+        d = queue.get()
+        for k,v,in d.items():
+            merged_result[k] = merged_result.get(k, 0) + v
+
+    return list(merged_result.items())
 
 
 def bpe_train(
@@ -140,8 +158,8 @@ def bpe_train(
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/bpe_example.txt", 270, ["[<|endoftext|>"])
-_, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["[<|endoftext|>"])
+_, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/bpe_example.txt", 270, ["[<|endoftext|>"])
+# _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["[<|endoftext|>"])
 # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt", 512, ["[<|endoftext|>"])
 print(merge)
 
