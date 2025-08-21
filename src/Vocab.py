@@ -44,6 +44,7 @@ class Vocab:
         index = 0
         for b in self._vocab:
             d[index] = b
+            index += 1
         return d
 
     def __len__(self) -> int:

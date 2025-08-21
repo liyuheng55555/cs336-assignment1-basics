@@ -3,3 +3,54 @@ def connection_to_str(tp: tuple[bytes, bytes]) -> str:
 
 def max_connection(connections: list[tuple[bytes,bytes]]) -> tuple[bytes,bytes]:
     return max(connections, key=lambda x: (x[0].decode("utf-8"), x[1].decode("utf-8")))
+
+# def split_then_merge(word: bytes, merge_rules: list[tuple[bytes,bytes]]) -> list[bytes]:
+#     bytes_list = list(bytes([x]) for x in word)
+#     while True:
+#         merged_bytes_list = merge_once(bytes_list, merge_rules)
+#         if merged_bytes_list is None:
+#             return bytes_list
+#         else:
+#             bytes_list = merged_bytes_list
+
+def word_to_bytes_list(word: bytes) -> list[bytes]:
+    return list(bytes([x]) for x in word)
+
+def merge_once(bytes_list: list[bytes], merge_rules: list[tuple[bytes,bytes]]) -> list[bytes] | None:
+    for merge_rule in merge_rules:
+        merge_result: list[bytes] = []
+        idx = 1
+        merged = False
+        while idx < len(bytes_list):
+            if (bytes_list[idx-1], bytes_list[idx]) == merge_rule:
+                merge_result.append(bytes_list[idx-1] + bytes_list[idx])
+                idx += 2
+                merged = True
+            else:
+                merge_result.append(bytes_list[idx-1])
+                idx += 1
+        if merged:
+            return merge_result
+    return None
+
+def merge_by_one_rule(bytes_list: list[bytes], merge_rule: tuple[bytes, bytes]) -> list[bytes] | None:
+    merge_result: list[bytes] = []
+    idx = 0
+    merged = False
+
+    while idx + 1 < len(bytes_list):
+        if (bytes_list[idx], bytes_list[idx+1]) == merge_rule:
+            # 可合并
+            merge_result.append(bytes_list[idx] + bytes_list[idx+1])
+            idx += 2
+            merged = True
+        else:
+            # 不可合并
+            merge_result.append(bytes_list[idx])
+            idx += 1
+
+    if idx < len(bytes_list):
+        # 处理尾部
+        merge_result.append(bytes_list[-1])
+
+    return merge_result if merged else None
