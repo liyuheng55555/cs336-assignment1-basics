@@ -11,7 +11,11 @@ import regex as re
 from cs336_basics.pretokenization_example import find_chunk_boundaries
 from src.Vocab import Vocab
 from src.type_define import Index, Connection, Num, TokenList, GB
-from src.utils import bytes_to_bytes_list, merge_by_one_rule, bytes_list_to_connections
+from src.utils import (
+    bytes_to_bytes_list,
+    merge_by_one_rule,
+    bytes_list_to_connections,
+)
 
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
@@ -80,7 +84,11 @@ def update(
 
 
 def pre_tokenize_worker(
-    queue: Queue, input_path: str, start: int, end: int, special_tokens: list[str]
+    queue: Queue,
+    input_path: str,
+    start: int,
+    end: int,
+    special_tokens: list[str],
 ):
     with open(input_path, "rb") as f:
         f.seek(start)

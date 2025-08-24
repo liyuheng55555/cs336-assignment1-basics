@@ -51,6 +51,9 @@ ignore = [
     "F722"
 ]
 
+[tool.black]
+line-length = 80
+# 在默认忽略基础上追加忽略
 extend-exclude = '''
 /(
   tests
