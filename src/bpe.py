@@ -1,12 +1,16 @@
 import logging
+import time
+from collections import deque
+from io import BufferedReader
 from multiprocessing import Process, Queue
 from time import perf_counter
+from queue import Empty
 
 import regex as re
 
 from cs336_basics.pretokenization_example import find_chunk_boundaries
 from src.Vocab import Vocab
-from src.type_define import Index, Connection, Num, TokenList
+from src.type_define import Index, Connection, Num, TokenList, GB
 from src.utils import bytes_to_bytes_list, merge_by_one_rule, \
     bytes_list_to_connections
 
@@ -72,7 +76,13 @@ def update(
         all_bytes[i] = (new_bytes_list, nums)
 
 
-def pre_tokenize_worker(queue: Queue, chunk: str, special_tokens: list[str]):
+def pre_tokenize_worker(queue: Queue, input_path: str, start: int, end: int, special_tokens: list[str]):
+    with open(input_path, "rb") as f:
+        f.seek(start)
+        chunk = f.read(end - start).decode("utf-8", errors="ignore")
+
+    logging.info(f"start {start} to {end}")
+
     pattern = "|".join(re.escape(token) for token in special_tokens)
     contents = [c for c in re.split(pattern, chunk) if c]
 
@@ -90,30 +100,43 @@ def pre_tokenize_worker(queue: Queue, chunk: str, special_tokens: list[str]):
     queue.put(all_words)
 
 
-def pre_tokenize(input_path: str, special_tokens: list[str]) -> list[tuple[TokenList, Num]]:
+def pre_tokenize(input_path: str, special_tokens: list[str], concurrency: int = 6) -> list[tuple[TokenList, Num]]:
     queue: Queue = Queue()
-    workers: list[Process] = []
+    workers: deque[Process] = deque()
     with open(input_path, "rb") as f:
         # raw_content = f.read().decode("utf-8", errors="ignore")
-        boundaries = find_chunk_boundaries(f, 6, list(token.encode("utf-8") for token in special_tokens))
+        boundaries = find_chunk_boundaries(
+            f,
+            concurrency,
+            list(token.encode("utf-8") for token in special_tokens),
+            max_memory_in_bytes=1*GB
+        )
+        logging.info(f"文件切分为{len(boundaries)-1}块")
         for start, end in zip(boundaries[:-1], boundaries[1:]):
-            logging.info(f"start {start} to {end}")
-            f.seek(start)
-            chunk = f.read(end - start).decode("utf-8", errors="ignore")
-            process = Process(target=pre_tokenize_worker, args=(queue, chunk, special_tokens))
+            process = Process(target=pre_tokenize_worker, args=(queue, input_path, start, end, special_tokens))
             workers.append(process)
-            process.start()
 
-    logging.info("子进程提交完毕")
+    logging.info("子进程准备完毕")
+
+    for i in range(concurrency):
+        workers.pop().start()
+        time.sleep(1)
+
+    logging.info(f"首批{concurrency}个进程启动")
+
+    finished_worker_count = 0
 
     merged_result: dict[bytes, Num] = {}
-    for _ in workers:
+
+    while finished_worker_count < len(workers):
+        # 每结束一个进程，就开一个新进程
         d: dict[bytes, int] = queue.get()
+        finished_worker_count += 1
+        logging.info(f"第 {finished_worker_count} 个任务完成")
+        if len(workers) != 0:
+            workers.pop().start()
         for k,v in d.items():
             merged_result[k] = merged_result.get(k, 0) + v
-
-    for worker in workers:
-        worker.join()
 
     logging.info("结果汇总完毕")
 

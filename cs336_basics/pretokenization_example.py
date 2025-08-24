@@ -1,15 +1,22 @@
+import logging
 import os
 from typing import BinaryIO
+
+from src.type_define import GB
 
 
 def find_chunk_boundaries(
     file: BinaryIO,
     desired_num_chunks: int,
     split_special_tokens: list[bytes],
+    max_memory_in_bytes: int = 16*GB,
 ) -> list[int]:
     """
     Chunk the file into parts that can be counted independently.
     May return fewer chunks if the boundaries end up overlapping.
+    如果文件总长度小于max_memory_in_bytes，那么按照desired_num_chunks进行切分；
+    如果文件总长度小于max_memory_in_bytes，
+    那么按照每块小于max_memory_in_bytes / desired_num_chunks 进行切分
     """
     assert isinstance(split_special_tokens, list), "Must represent special token as a bytestring"
 
@@ -18,7 +25,14 @@ def find_chunk_boundaries(
     file_size = file.tell()
     file.seek(0)
 
-    chunk_size = file_size // desired_num_chunks
+    chunk_size: int
+    if file_size < max_memory_in_bytes:
+        chunk_size = file_size // desired_num_chunks
+    else:
+        user_desired_num_chunks = desired_num_chunks
+        chunk_size = max_memory_in_bytes // desired_num_chunks
+        desired_num_chunks = file_size // chunk_size
+        logging.warning(f"文件大小超出内存限制，预计chunk数由{user_desired_num_chunks}调整为{desired_num_chunks}，预计最大内存占用为{user_desired_num_chunks} * {chunk_size} = {user_desired_num_chunks*chunk_size/GB} GB")
 
     # Initial guesses for chunk boundary locations, uniformly spaced
     # Chunks start on previous index, don't include last index
