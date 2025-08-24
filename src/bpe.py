@@ -114,7 +114,7 @@ def pre_tokenize(
             f,
             concurrency,
             list(token.encode("utf-8") for token in special_tokens),
-            max_memory_in_bytes=1 * GB,
+            max_memory_in_bytes=16 * GB,
         )
         logging.info(f"文件切分为{len(boundaries)-1}块")
         for start, end in zip(boundaries[:-1], boundaries[1:]):
@@ -163,7 +163,9 @@ def bpe_train(
     for token in special_tokens:
         vocab.put(token.encode("utf-8"))
 
+    pre_tokenize_start = perf_counter()
     all_bytes = pre_tokenize(input_path, special_tokens)
+    pre_tokenize_end = perf_counter()
 
     idx = 0
     last_contributors_index: list[Index] = []
@@ -190,9 +192,12 @@ def bpe_train(
         # update vocab
         vocab.put(best_connection[0] + best_connection[1])
 
-        print(idx)
+        # print(idx)
 
-    print("============\n\n")
+    calculate_end = perf_counter()
+
+    print(f"预分词耗时: {pre_tokenize_end - pre_tokenize_start:.6f} 秒")
+    print(f"计算耗时：{calculate_end - pre_tokenize_end:.6f} 秒")
 
     return vocab.build_dict(), merge_rules
 
@@ -202,7 +207,7 @@ if __name__ == "__main__":
         level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
-    start = perf_counter()
+    main_start = perf_counter()
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/bpe_example.txt", 270, ["<|endoftext|>"])
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["<|endoftext|>"])
     _, merge = bpe_train(
@@ -212,6 +217,6 @@ if __name__ == "__main__":
     )
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_valid.txt", 10000, ["<|endoftext|>"])
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_train.txt", 10000, ["<|endoftext|>"])
-    print(merge)
-    end = perf_counter()
-    print(f"总耗时: {end - start:.6f} 秒")
+    # print(merge)
+    main_end = perf_counter()
+    print(f"总耗时: {main_end - main_start:.6f} 秒")
