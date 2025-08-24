@@ -19,6 +19,7 @@ def find_best_connection(
 ) -> tuple[Connection, set[Index]]:
     best_connections: list[tuple[Connection, set[Index]]] = []
     max_nums = 0
+    logging.info(f"connections_num_map size {len(connections_num_map)}")
     for connection, nums in connections_num_map.items():
         contributors_index: set[Index] = connections_contrib_map[connection]
         if nums > max_nums:
@@ -54,8 +55,12 @@ def update(
             for connection in old_connections:
                 if connection in connections_num_map:
                     connections_num_map[connection] -= nums
-                    if i in connections_contrib_map[connection]:
+                    if connections_num_map[connection] == 0:
+                        connections_num_map.pop(connection)
+                    if connection in connections_contrib_map and i in connections_contrib_map[connection]:
                         connections_contrib_map[connection].remove(i)
+                        if len(connections_contrib_map[connection]) == 0:
+                            connections_contrib_map.pop(connection)
         # 然后新的connection加入统计
         new_connections = bytes_list_to_connections(new_bytes_list)
         for connection in new_connections:
@@ -153,7 +158,7 @@ def bpe_train(
         # update vocab
         vocab.put(best_connection[0] + best_connection[1])
 
-        # print(idx)
+        print(idx)
 
     print("============\n\n")
 
@@ -166,6 +171,8 @@ if __name__ == "__main__":
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/bpe_example.txt", 270, ["<|endoftext|>"])
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["<|endoftext|>"])
     _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt", 10000, ["<|endoftext|>"])
+    # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_valid.txt", 10000, ["<|endoftext|>"])
+    # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_train.txt", 10000, ["<|endoftext|>"])
     print(merge)
     end = perf_counter()
     print(f"总耗时: {end - start:.6f} 秒")
