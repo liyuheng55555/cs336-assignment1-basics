@@ -33,10 +33,17 @@ class BucketMaxSD:
     def decr(self, conn, d=1):
         self.set(conn, self.counts.get(conn, 0) - d)
 
-
     def max_item(self) -> tuple[Connection, Num]:
         num: Num
         s: set[Connection]
         num, s = self.buckets.peekitem(-1)
-        return next(iter(s)), num
+        return max(s), num
+
+    def __len__(self):
+        return len(self.counts)
+
+    def __contains__(self, item):
+        if not isinstance(item, tuple):
+            return False
+        return item in self.counts
 

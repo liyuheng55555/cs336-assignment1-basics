@@ -1,14 +1,13 @@
 import logging
 import time
 from collections import deque
-from io import BufferedReader
 from multiprocessing import Process, Queue
 from time import perf_counter
-from queue import Empty
 
 import regex as re
 
 from cs336_basics.pretokenization_example import find_chunk_boundaries
+from src.BucketMaxSD import BucketMaxSD
 from src.Vocab import Vocab
 from src.type_define import Index, Connection, Num, TokenList, GB
 from src.utils import (
@@ -21,30 +20,23 @@ PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s
 
 
 def find_best_connection(
-    connections_num_map: dict[Connection, Num],
+    connections_num_map: BucketMaxSD,
     connections_contrib_map: dict[Connection, set[Index]],
 ) -> tuple[Connection, set[Index]]:
-    best_connections: list[tuple[Connection, set[Index]]] = []
-    max_nums = 0
     logging.info(f"connections_num_map size {len(connections_num_map)}")
-    for connection, nums in connections_num_map.items():
-        contributors_index: set[Index] = connections_contrib_map[connection]
-        if nums > max_nums:
-            best_connections = [(connection, contributors_index)]
-            max_nums = nums
-        elif nums == max_nums:
-            best_connections.append((connection, contributors_index))
-    return max(best_connections)
+    max_connection, _ = connections_num_map.max_item()
+    contributors_index = connections_contrib_map[max_connection]
+    return max_connection, contributors_index
 
 
 def update(
     all_bytes: list[tuple[TokenList, int]],
     last_contributors_index: list[Index],
-    connections_num_map: dict[Connection, Num],
+    connections_num_map: BucketMaxSD,
     connections_contrib_map: dict[Connection, set[Index]],
     merge_rule: Connection,
 ):
-    if last_contributors_index == []:
+    if not last_contributors_index:
         last_contributors_index = list(range(len(all_bytes)))
     for i in last_contributors_index:
         bytes_list: TokenList = all_bytes[i][0]
@@ -62,9 +54,7 @@ def update(
             old_connections = bytes_list_to_connections(bytes_list)
             for connection in old_connections:
                 if connection in connections_num_map:
-                    connections_num_map[connection] -= nums
-                    if connections_num_map[connection] == 0:
-                        connections_num_map.pop(connection)
+                    connections_num_map.decr(connection, nums)
                     if (
                         connection in connections_contrib_map
                         and i in connections_contrib_map[connection]
@@ -75,10 +65,9 @@ def update(
         # 然后新的connection加入统计
         new_connections = bytes_list_to_connections(new_bytes_list)
         for connection in new_connections:
-            if connection not in connections_num_map:
-                connections_num_map[connection] = 0
+            connections_num_map.incr(connection, nums)
+            if connection not in connections_contrib_map:
                 connections_contrib_map[connection] = set()
-            connections_num_map[connection] += nums
             connections_contrib_map[connection].add(i)
         all_bytes[i] = (new_bytes_list, nums)
 
@@ -178,7 +167,7 @@ def bpe_train(
 
     idx = 0
     last_contributors_index: list[Index] = []
-    connections_num_map: dict[Connection, Num] = {}
+    connections_num_map = BucketMaxSD()
     connections_contrib_map: dict[Connection, set[Index]] = {}
     while len(vocab) < vocab_size:
         idx += 1
