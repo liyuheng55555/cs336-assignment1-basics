@@ -1,9 +1,7 @@
-
-
 class Vocab:
     def __init__(self):
         self._vocab: set[bytes] = set()
-        self._counter: int = 0   # 从 0 开始计数
+        self._counter: int = 0  # 从 0 开始计数
 
     def put(self, token: bytes) -> int:
         key = self._counter
@@ -34,7 +32,7 @@ class Vocab:
                     break
             if match is None:
                 # 如果没有匹配到，就退化成单字节
-                match = word[i:i+1]
+                match = word[i : i + 1]
             result.append(match)
             i += len(match)
         return result

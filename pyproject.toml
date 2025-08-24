@@ -50,3 +50,9 @@ extend-select = ["UP"]
 ignore = [
     "F722"
 ]
+
+extend-exclude = '''
+/(
+  tests
+)/
+'''

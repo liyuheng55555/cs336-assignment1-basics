@@ -11,15 +11,14 @@ import regex as re
 from cs336_basics.pretokenization_example import find_chunk_boundaries
 from src.Vocab import Vocab
 from src.type_define import Index, Connection, Num, TokenList, GB
-from src.utils import bytes_to_bytes_list, merge_by_one_rule, \
-    bytes_list_to_connections
+from src.utils import bytes_to_bytes_list, merge_by_one_rule, bytes_list_to_connections
 
 PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
 
 def find_best_connection(
-        connections_num_map: dict[Connection,Num],
-        connections_contrib_map: dict[Connection,set[Index]]
+    connections_num_map: dict[Connection, Num],
+    connections_contrib_map: dict[Connection, set[Index]],
 ) -> tuple[Connection, set[Index]]:
     best_connections: list[tuple[Connection, set[Index]]] = []
     max_nums = 0
@@ -33,12 +32,13 @@ def find_best_connection(
             best_connections.append((connection, contributors_index))
     return max(best_connections)
 
+
 def update(
-        all_bytes: list[tuple[TokenList, int]],
-        last_contributors_index: list[Index],
-        connections_num_map: dict[Connection,Num],
-    connections_contrib_map: dict[Connection,set[Index]],
-        merge_rule: Connection
+    all_bytes: list[tuple[TokenList, int]],
+    last_contributors_index: list[Index],
+    connections_num_map: dict[Connection, Num],
+    connections_contrib_map: dict[Connection, set[Index]],
+    merge_rule: Connection,
 ):
     if last_contributors_index == []:
         last_contributors_index = list(range(len(all_bytes)))
@@ -48,7 +48,7 @@ def update(
         # 根据最新的一条合并规则进行合并
         new_bytes_list: TokenList
         if merge_rule is not None:
-            new_bytes_list = merge_by_one_rule(bytes_list,merge_rule)
+            new_bytes_list = merge_by_one_rule(bytes_list, merge_rule)
         else:
             new_bytes_list = bytes_list
         if new_bytes_list is None:
@@ -61,7 +61,10 @@ def update(
                     connections_num_map[connection] -= nums
                     if connections_num_map[connection] == 0:
                         connections_num_map.pop(connection)
-                    if connection in connections_contrib_map and i in connections_contrib_map[connection]:
+                    if (
+                        connection in connections_contrib_map
+                        and i in connections_contrib_map[connection]
+                    ):
                         connections_contrib_map[connection].remove(i)
                         if len(connections_contrib_map[connection]) == 0:
                             connections_contrib_map.pop(connection)
@@ -76,7 +79,9 @@ def update(
         all_bytes[i] = (new_bytes_list, nums)
 
 
-def pre_tokenize_worker(queue: Queue, input_path: str, start: int, end: int, special_tokens: list[str]):
+def pre_tokenize_worker(
+    queue: Queue, input_path: str, start: int, end: int, special_tokens: list[str]
+):
     with open(input_path, "rb") as f:
         f.seek(start)
         chunk = f.read(end - start).decode("utf-8", errors="ignore")
@@ -86,9 +91,11 @@ def pre_tokenize_worker(queue: Queue, input_path: str, start: int, end: int, spe
     pattern = "|".join(re.escape(token) for token in special_tokens)
     contents = [c for c in re.split(pattern, chunk) if c]
 
-    print(f"特殊符号切分完成, 共{len(contents)}段", )
+    print(
+        f"特殊符号切分完成, 共{len(contents)}段",
+    )
 
-    all_words : dict[bytes, int] = {} # "xxx" -> nums
+    all_words: dict[bytes, int] = {}  # "xxx" -> nums
     for content in contents:
         for match in re.finditer(PAT, content):
             word = match.group()
@@ -100,20 +107,24 @@ def pre_tokenize_worker(queue: Queue, input_path: str, start: int, end: int, spe
     queue.put(all_words)
 
 
-def pre_tokenize(input_path: str, special_tokens: list[str], concurrency: int = 6) -> list[tuple[TokenList, Num]]:
+def pre_tokenize(
+    input_path: str, special_tokens: list[str], concurrency: int = 6
+) -> list[tuple[TokenList, Num]]:
     queue: Queue = Queue()
     workers: deque[Process] = deque()
     with open(input_path, "rb") as f:
-        # raw_content = f.read().decode("utf-8", errors="ignore")
         boundaries = find_chunk_boundaries(
             f,
             concurrency,
             list(token.encode("utf-8") for token in special_tokens),
-            max_memory_in_bytes=1*GB
+            max_memory_in_bytes=1 * GB,
         )
         logging.info(f"文件切分为{len(boundaries)-1}块")
         for start, end in zip(boundaries[:-1], boundaries[1:]):
-            process = Process(target=pre_tokenize_worker, args=(queue, input_path, start, end, special_tokens))
+            process = Process(
+                target=pre_tokenize_worker,
+                args=(queue, input_path, start, end, special_tokens),
+            )
             workers.append(process)
 
     logging.info("子进程准备完毕")
@@ -127,8 +138,6 @@ def pre_tokenize(input_path: str, special_tokens: list[str], concurrency: int = 
 
     logging.info(f"首批{concurrency}个进程启动")
 
-
-
     merged_result: dict[bytes, Num] = {}
 
     while finished_worker_count < worker_count:
@@ -138,7 +147,7 @@ def pre_tokenize(input_path: str, special_tokens: list[str], concurrency: int = 
         logging.info(f"第 {finished_worker_count} 个任务完成")
         if len(workers) != 0:
             workers.pop().start()
-        for k,v in d.items():
+        for k, v in d.items():
             merged_result[k] = merged_result.get(k, 0) + v
 
     logging.info("结果汇总完毕")
@@ -147,14 +156,12 @@ def pre_tokenize(input_path: str, special_tokens: list[str], concurrency: int = 
 
 
 def bpe_train(
-        input_path: str,
-        vocab_size: int,
-        special_tokens: list[str]
+    input_path: str, vocab_size: int, special_tokens: list[str]
 ) -> tuple[dict[int, bytes], list[Connection]]:
     vocab = Vocab()
     merge_rules: list[Connection] = []
 
-    for i in range(0,256):
+    for i in range(0, 256):
         vocab.put(bytes([i]))
     for token in special_tokens:
         vocab.put(token.encode("utf-8"))
@@ -163,8 +170,8 @@ def bpe_train(
 
     idx = 0
     last_contributors_index: list[Index] = []
-    connections_num_map: dict[Connection,Num] = {}
-    connections_contrib_map: dict[Connection,set[Index]] = {}
+    connections_num_map: dict[Connection, Num] = {}
+    connections_contrib_map: dict[Connection, set[Index]] = {}
     while len(vocab) < vocab_size:
         idx += 1
         # calculate connections
@@ -173,11 +180,13 @@ def bpe_train(
             last_contributors_index,
             connections_num_map,
             connections_contrib_map,
-            merge_rules[-1] if len(merge_rules) > 0 else None
+            merge_rules[-1] if len(merge_rules) > 0 else None,
         )
 
         # find best connection
-        best_connection, contributors = find_best_connection(connections_num_map, connections_contrib_map)
+        best_connection, contributors = find_best_connection(
+            connections_num_map, connections_contrib_map
+        )
         last_contributors_index = list(contributors)
         merge_rules.append(best_connection)
 
@@ -190,17 +199,22 @@ def bpe_train(
 
     return vocab.build_dict(), merge_rules
 
+
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
 
     start = perf_counter()
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/bpe_example.txt", 270, ["<|endoftext|>"])
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["<|endoftext|>"])
-    _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt", 10000, ["<|endoftext|>"])
+    _, merge = bpe_train(
+        "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt",
+        10000,
+        ["<|endoftext|>"],
+    )
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_valid.txt", 10000, ["<|endoftext|>"])
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_train.txt", 10000, ["<|endoftext|>"])
     print(merge)
     end = perf_counter()
     print(f"总耗时: {end - start:.6f} 秒")
-
-
