@@ -23,10 +23,45 @@ def find_best_connection(
     connections_num_map: BucketMaxSD,
     connections_contrib_map: dict[Connection, set[Index]],
 ) -> tuple[Connection, set[Index]]:
-    logging.info(f"connections_num_map size {len(connections_num_map)}")
     max_connection, _ = connections_num_map.max_item()
     contributors_index = connections_contrib_map[max_connection]
     return max_connection, contributors_index
+
+def remove_old_connection(
+        old_token_list: TokenList,
+        nums: Num,
+        i: int,
+        connections_num_map: BucketMaxSD,
+        connections_contrib_map: dict[Connection, set[Index]],
+):
+    old_connections = bytes_list_to_connections(old_token_list)
+    for connection in old_connections:
+        if connection in connections_num_map:
+            connections_num_map.decr(connection, nums)
+            if (
+                    connection in connections_contrib_map
+                    and i in connections_contrib_map[connection]
+            ):
+                connections_contrib_map[connection].remove(i)
+                if len(connections_contrib_map[connection]) == 0:
+                    connections_contrib_map.pop(connection)
+
+
+def update_by_new_connection(
+        new_bytes_list: TokenList,
+        nums: Num,
+        i: int,
+        connections_num_map: BucketMaxSD,
+        connections_contrib_map: dict[Connection, set[Index]],
+        all_bytes: list[tuple[TokenList, int]],
+):
+    new_connections = bytes_list_to_connections(new_bytes_list)
+    for connection in new_connections:
+        connections_num_map.incr(connection, nums)
+        if connection not in connections_contrib_map:
+            connections_contrib_map[connection] = set()
+        connections_contrib_map[connection].add(i)
+    all_bytes[i] = (new_bytes_list, nums)
 
 
 def update(
@@ -51,25 +86,9 @@ def update(
             new_bytes_list = token_list
         # 旧的connection从统计中清除
         if merge_rule is not None:
-            old_connections = bytes_list_to_connections(token_list)
-            for connection in old_connections:
-                if connection in connections_num_map:
-                    connections_num_map.decr(connection, nums)
-                    if (
-                        connection in connections_contrib_map
-                        and i in connections_contrib_map[connection]
-                    ):
-                        connections_contrib_map[connection].remove(i)
-                        if len(connections_contrib_map[connection]) == 0:
-                            connections_contrib_map.pop(connection)
+            remove_old_connection(token_list, nums, i, connections_num_map, connections_contrib_map)
         # 新的connection加入统计
-        new_connections = bytes_list_to_connections(new_bytes_list)
-        for connection in new_connections:
-            connections_num_map.incr(connection, nums)
-            if connection not in connections_contrib_map:
-                connections_contrib_map[connection] = set()
-            connections_contrib_map[connection].add(i)
-        all_bytes[i] = (new_bytes_list, nums)
+        update_by_new_connection(new_bytes_list, nums, i, connections_num_map, connections_contrib_map, all_bytes)
 
 
 def pre_tokenize_worker(
@@ -192,7 +211,8 @@ def bpe_train(
         # update vocab
         vocab.put(best_connection[0] + best_connection[1])
 
-        # print(idx)
+        if idx % 16 == 0:
+            connections_num_map.message()
 
     calculate_end = perf_counter()
 
@@ -212,7 +232,7 @@ if __name__ == "__main__":
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["<|endoftext|>"])
     _, merge = bpe_train(
         "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt",
-        10000,
+        15000,
         ["<|endoftext|>"],
     )
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_valid.txt", 10000, ["<|endoftext|>"])
