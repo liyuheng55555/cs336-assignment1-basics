@@ -118,17 +118,20 @@ def pre_tokenize(input_path: str, special_tokens: list[str], concurrency: int = 
 
     logging.info("子进程准备完毕")
 
-    for i in range(concurrency):
+    finished_worker_count = 0
+    worker_count = len(workers)
+
+    for _ in range(min(concurrency, worker_count)):
         workers.pop().start()
-        time.sleep(1)
+        time.sleep(0.5)
 
     logging.info(f"首批{concurrency}个进程启动")
 
-    finished_worker_count = 0
+
 
     merged_result: dict[bytes, Num] = {}
 
-    while finished_worker_count < len(workers):
+    while finished_worker_count < worker_count:
         # 每结束一个进程，就开一个新进程
         d: dict[bytes, int] = queue.get()
         finished_worker_count += 1
