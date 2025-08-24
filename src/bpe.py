@@ -39,19 +39,19 @@ def update(
     if not last_contributors_index:
         last_contributors_index = list(range(len(all_bytes)))
     for i in last_contributors_index:
-        bytes_list: TokenList = all_bytes[i][0]
+        token_list: TokenList = all_bytes[i][0]
         nums: int = all_bytes[i][1]
         # 根据最新的一条合并规则进行合并
         new_bytes_list: TokenList
         if merge_rule is not None:
-            new_bytes_list = merge_by_one_rule(bytes_list, merge_rule)
+            new_bytes_list = merge_by_one_rule(token_list, merge_rule)
         else:
-            new_bytes_list = bytes_list
+            new_bytes_list = token_list
         if new_bytes_list is None:
-            new_bytes_list = bytes_list
-        # 旧的connection需要从统计中清除
+            new_bytes_list = token_list
+        # 旧的connection从统计中清除
         if merge_rule is not None:
-            old_connections = bytes_list_to_connections(bytes_list)
+            old_connections = bytes_list_to_connections(token_list)
             for connection in old_connections:
                 if connection in connections_num_map:
                     connections_num_map.decr(connection, nums)
@@ -62,7 +62,7 @@ def update(
                         connections_contrib_map[connection].remove(i)
                         if len(connections_contrib_map[connection]) == 0:
                             connections_contrib_map.pop(connection)
-        # 然后新的connection加入统计
+        # 新的connection加入统计
         new_connections = bytes_list_to_connections(new_bytes_list)
         for connection in new_connections:
             connections_num_map.incr(connection, nums)
