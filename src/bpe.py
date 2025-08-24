@@ -1,4 +1,6 @@
 import logging
+import os
+import pickle
 import time
 from collections import deque
 from multiprocessing import Process, Queue
@@ -171,6 +173,27 @@ def pre_tokenize(
     return list((bytes_to_bytes_list(k), v) for k, v in merged_result.items())
 
 
+def _save_cache(cache_filename: str, special_tokens: list[str], all_bytes: list[tuple[TokenList, Num]]):
+    """保存预分词结果到缓存文件"""
+    try:
+        with open(cache_filename, "wb") as f:
+            pickle.dump({
+                "special_tokens": special_tokens,
+                "all_bytes": all_bytes
+            }, f)
+        logging.info(f"预分词结果已缓存到: {cache_filename}")
+    except Exception as save_error:
+        logging.warning(f"保存缓存失败: {save_error}")
+
+
+def _do_pretokenize_and_cache(input_path: str, special_tokens: list[str], cache_filename: str) -> list[tuple[TokenList, Num]]:
+    """执行预分词并缓存结果"""
+    all_bytes = pre_tokenize(input_path, special_tokens)
+    
+    _save_cache(cache_filename, special_tokens, all_bytes)
+    return all_bytes
+
+
 def bpe_train(
     input_path: str, vocab_size: int, special_tokens: list[str]
 ) -> tuple[dict[int, bytes], list[Connection]]:
@@ -183,7 +206,33 @@ def bpe_train(
         vocab.put(token.encode("utf-8"))
 
     pre_tokenize_start = perf_counter()
-    all_bytes = pre_tokenize(input_path, special_tokens)
+
+    # 生成缓存文件名
+    cache_filename = f"{input_path}.pretokenize_cache.pkl"
+    
+    # 尝试加载缓存
+    if os.path.exists(cache_filename):
+        logging.info(f"发现预分词缓存文件: {cache_filename}")
+        try:
+            with open(cache_filename, "rb") as f:
+                cached_data = pickle.load(f)
+                if cached_data["special_tokens"] == special_tokens:
+                    logging.info("缓存文件有效，直接使用")
+                    all_bytes = cached_data["all_bytes"]
+
+                else:
+                    logging.info("特殊token不匹配，重新预分词")
+                    raise ValueError("Token mismatch")
+        except Exception as e:
+            logging.warning(f"读取缓存失败: {e}，重新预分词")
+            all_bytes = _do_pretokenize_and_cache(
+                input_path, special_tokens, cache_filename
+            )
+    else:
+        logging.info("未发现缓存文件，开始预分词")
+        all_bytes = _do_pretokenize_and_cache(
+            input_path, special_tokens, cache_filename
+        )
     pre_tokenize_end = perf_counter()
 
     idx = 0
@@ -228,14 +277,15 @@ if __name__ == "__main__":
     )
 
     main_start = perf_counter()
+    # 测试缓存功能 - 使用小数据集
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/bpe_example.txt", 270, ["<|endoftext|>"])
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["<|endoftext|>"])
-    _, merge = bpe_train(
-        "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt",
-        15000,
-        ["<|endoftext|>"],
-    )
-    # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_valid.txt", 10000, ["<|endoftext|>"])
+    # _, merge = bpe_train(
+    #     "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt",
+    #     15000,
+    #     ["<|endoftext|>"],
+    # )
+    _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_valid.txt", 32000, ["<|endoftext|>"])
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_train.txt", 10000, ["<|endoftext|>"])
     # print(merge)
     main_end = perf_counter()
