@@ -1,4 +1,5 @@
-from src.type_define import Connection
+from src.type_define import Connection, GPT2_PAT
+import regex as re
 
 
 def connection_to_str(tp: tuple[bytes, bytes]) -> str:
@@ -76,4 +77,22 @@ def bytes_list_to_connections(bytes_list: list[bytes]) -> list[Connection]:
     result: list[Connection] = []
     for i in range(1, len(bytes_list)):
         result.append((bytes_list[i - 1], bytes_list[i]))
+    return result
+
+
+def chunk_split(
+    chunk: str,
+    special_tokens: list[str] | None,
+) -> list[str]:
+    contents: list[str]
+    if special_tokens is not None:
+        pattern = "|".join(re.escape(token) for token in special_tokens)
+        contents = [c for c in re.split(pattern, chunk) if c]
+    else:
+        contents = [chunk]
+    result = []
+    for content in contents:
+        for match in re.finditer(GPT2_PAT, content):
+            word = match.group()
+            result.append(word)
     return result

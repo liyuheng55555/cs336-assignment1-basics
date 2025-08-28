@@ -11,14 +11,12 @@ import regex as re
 from cs336_basics.pretokenization_example import find_chunk_boundaries
 from src.BucketMaxSD import BucketMaxSD
 from src.Vocab import Vocab
-from src.type_define import Index, Connection, Num, TokenList, GB
+from src.type_define import Index, Connection, Num, TokenList, GB, GPT2_PAT
 from src.utils import (
     bytes_to_bytes_list,
     merge_by_one_rule,
     bytes_list_to_connections,
 )
-
-PAT = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
 
 
 def find_best_connection(
@@ -29,20 +27,21 @@ def find_best_connection(
     contributors_index = connections_contrib_map[max_connection]
     return max_connection, contributors_index
 
+
 def remove_old_connection(
-        old_token_list: TokenList,
-        nums: Num,
-        i: int,
-        connections_num_map: BucketMaxSD,
-        connections_contrib_map: dict[Connection, set[Index]],
+    old_token_list: TokenList,
+    nums: Num,
+    i: int,
+    connections_num_map: BucketMaxSD,
+    connections_contrib_map: dict[Connection, set[Index]],
 ):
     old_connections = bytes_list_to_connections(old_token_list)
     for connection in old_connections:
         if connection in connections_num_map:
             connections_num_map.decr(connection, nums)
             if (
-                    connection in connections_contrib_map
-                    and i in connections_contrib_map[connection]
+                connection in connections_contrib_map
+                and i in connections_contrib_map[connection]
             ):
                 connections_contrib_map[connection].remove(i)
                 if len(connections_contrib_map[connection]) == 0:
@@ -50,12 +49,12 @@ def remove_old_connection(
 
 
 def update_by_new_connection(
-        new_bytes_list: TokenList,
-        nums: Num,
-        i: int,
-        connections_num_map: BucketMaxSD,
-        connections_contrib_map: dict[Connection, set[Index]],
-        all_bytes: list[tuple[TokenList, int]],
+    new_bytes_list: TokenList,
+    nums: Num,
+    i: int,
+    connections_num_map: BucketMaxSD,
+    connections_contrib_map: dict[Connection, set[Index]],
+    all_bytes: list[tuple[TokenList, int]],
 ):
     new_connections = bytes_list_to_connections(new_bytes_list)
     for connection in new_connections:
@@ -88,9 +87,22 @@ def update(
             new_bytes_list = token_list
         # 旧的connection从统计中清除
         if merge_rule is not None:
-            remove_old_connection(token_list, nums, i, connections_num_map, connections_contrib_map)
+            remove_old_connection(
+                token_list,
+                nums,
+                i,
+                connections_num_map,
+                connections_contrib_map,
+            )
         # 新的connection加入统计
-        update_by_new_connection(new_bytes_list, nums, i, connections_num_map, connections_contrib_map, all_bytes)
+        update_by_new_connection(
+            new_bytes_list,
+            nums,
+            i,
+            connections_num_map,
+            connections_contrib_map,
+            all_bytes,
+        )
 
 
 def pre_tokenize_worker(
@@ -115,7 +127,7 @@ def pre_tokenize_worker(
 
     all_words: dict[bytes, int] = {}  # "xxx" -> nums
     for content in contents:
-        for match in re.finditer(PAT, content):
+        for match in re.finditer(GPT2_PAT, content):
             word = match.group()
             byte = word.encode("utf-8")
             all_words[byte] = all_words.get(byte, 0) + 1
@@ -135,7 +147,7 @@ def pre_tokenize(
             f,
             concurrency,
             list(token.encode("utf-8") for token in special_tokens),
-            max_memory_in_bytes=16 * GB,
+            max_memory_in_bytes=3 * GB,
         )
         logging.info(f"文件切分为{len(boundaries)-1}块")
         for start, end in zip(boundaries[:-1], boundaries[1:]):
@@ -173,23 +185,28 @@ def pre_tokenize(
     return list((bytes_to_bytes_list(k), v) for k, v in merged_result.items())
 
 
-def _save_cache(cache_filename: str, special_tokens: list[str], all_bytes: list[tuple[TokenList, Num]]):
+def _save_cache(
+    cache_filename: str,
+    special_tokens: list[str],
+    all_bytes: list[tuple[TokenList, Num]],
+):
     """保存预分词结果到缓存文件"""
     try:
         with open(cache_filename, "wb") as f:
-            pickle.dump({
-                "special_tokens": special_tokens,
-                "all_bytes": all_bytes
-            }, f)
+            pickle.dump(
+                {"special_tokens": special_tokens, "all_bytes": all_bytes}, f
+            )
         logging.info(f"预分词结果已缓存到: {cache_filename}")
     except Exception as save_error:
         logging.warning(f"保存缓存失败: {save_error}")
 
 
-def _do_pretokenize_and_cache(input_path: str, special_tokens: list[str], cache_filename: str) -> list[tuple[TokenList, Num]]:
+def _do_pretokenize_and_cache(
+    input_path: str, special_tokens: list[str], cache_filename: str
+) -> list[tuple[TokenList, Num]]:
     """执行预分词并缓存结果"""
     all_bytes = pre_tokenize(input_path, special_tokens)
-    
+
     _save_cache(cache_filename, special_tokens, all_bytes)
     return all_bytes
 
@@ -209,7 +226,7 @@ def bpe_train(
 
     # 生成缓存文件名
     cache_filename = f"{input_path}.pretokenize_cache.pkl"
-    
+
     # 尝试加载缓存
     if os.path.exists(cache_filename):
         logging.info(f"发现预分词缓存文件: {cache_filename}")
@@ -261,6 +278,7 @@ def bpe_train(
         vocab.put(best_connection[0] + best_connection[1])
 
         if idx % 16 == 0:
+            logging.info(f"idx {idx}")
             connections_num_map.message()
 
     calculate_end = perf_counter()
@@ -280,13 +298,15 @@ if __name__ == "__main__":
     # 测试缓存功能 - 使用小数据集
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/bpe_example.txt", 270, ["<|endoftext|>"])
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["<|endoftext|>"])
-    # _, merge = bpe_train(
-    #     "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt",
-    #     15000,
-    #     ["<|endoftext|>"],
-    # )
-    _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_valid.txt", 32000, ["<|endoftext|>"])
-    # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_train.txt", 10000, ["<|endoftext|>"])
+    _, merge = bpe_train(
+        "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt",
+        10000,
+        ["<|endoftext|>"],
+    )
+    # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_valid.txt", 32000, ["<|endoftext|>"])
+    # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_train.txt", 32000, ["<|endoftext|>"])
     # print(merge)
     main_end = perf_counter()
     print(f"总耗时: {main_end - main_start:.6f} 秒")
+
+    # 2025-08-24 21:52:04,794 - INFO - 预分词结果已缓存
