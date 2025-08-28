@@ -26,6 +26,9 @@ class Tokenizer:
         }
         self.MERGE_RULE_NOT_FOUND = 9999999
         self.special_tokens: list[str] = special_tokens
+        self.special_tokens_set: set[str] = (
+            set(special_tokens) if special_tokens is not None else set()
+        )
 
     @classmethod
     def from_files(
@@ -56,26 +59,31 @@ class Tokenizer:
             text, special_tokens=self.special_tokens
         )
         for word in word_list:
-            token_list: TokenList = bytes_to_bytes_list(word.encode("utf-8"))
-            while True:
-                connections: list[Connection] = bytes_list_to_connections(
-                    token_list
+            if word not in self.special_tokens_set:
+                token_list: TokenList = bytes_to_bytes_list(
+                    word.encode("utf-8")
                 )
-                chosen_merge_rule = None
-                min_index = self.MERGE_RULE_NOT_FOUND
-                for connection in connections:
-                    if connection in self.merge_rules_index:
-                        if self.merge_rules_index[connection] < min_index:
-                            min_index = self.merge_rules_index[connection]
-                            chosen_merge_rule = connection
-                if min_index != self.MERGE_RULE_NOT_FOUND:
-                    token_list = merge_by_one_rule(
-                        token_list, chosen_merge_rule
+                while True:
+                    connections: list[Connection] = bytes_list_to_connections(
+                        token_list
                     )
-                else:
-                    break
-            for token in token_list:
-                result.append(self.reverse_vocab[token])
+                    chosen_merge_rule = None
+                    min_index = self.MERGE_RULE_NOT_FOUND
+                    for connection in connections:
+                        if connection in self.merge_rules_index:
+                            if self.merge_rules_index[connection] < min_index:
+                                min_index = self.merge_rules_index[connection]
+                                chosen_merge_rule = connection
+                    if min_index != self.MERGE_RULE_NOT_FOUND:
+                        token_list = merge_by_one_rule(
+                            token_list, chosen_merge_rule
+                        )
+                    else:
+                        break
+                for token in token_list:
+                    result.append(self.reverse_vocab[token])
+            else:
+                result.append(self.reverse_vocab[word.encode("utf-8")])
         return result
 
     def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
@@ -86,5 +94,5 @@ class Tokenizer:
     def decode(self, ids: list[int]) -> str:
         result: str = ""
         for id in ids:
-            result += self.vocab[id]
+            result += self.vocab[id].decode("utf-8", errors="replace")
         return result

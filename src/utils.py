@@ -87,12 +87,19 @@ def chunk_split(
     contents: list[str]
     if special_tokens is not None:
         pattern = "|".join(re.escape(token) for token in special_tokens)
+        pattern = "(" + pattern + ")"
         contents = [c for c in re.split(pattern, chunk) if c]
     else:
         contents = [chunk]
+    special_tokens_set: set[str] = (
+        set(special_tokens) if special_tokens is not None else set()
+    )
     result = []
     for content in contents:
-        for match in re.finditer(GPT2_PAT, content):
-            word = match.group()
-            result.append(word)
+        if content not in special_tokens_set:
+            for match in re.finditer(GPT2_PAT, content):
+                word = match.group()
+                result.append(word)
+        else:
+            result.append(content)
     return result

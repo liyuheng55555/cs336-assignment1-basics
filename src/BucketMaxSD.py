@@ -8,7 +8,7 @@ from src.type_define import Connection, Num
 class BucketMaxSD:
     def __init__(self):
         self.counts: dict[Connection, Num] = {}
-        self.buckets = SortedDict() # Num->Set(Connection)
+        self.buckets = SortedDict()  # Num->Set(Connection)
         self.set_count = 0
         self.bucket_create_destroy_count = 0
 
@@ -37,7 +37,6 @@ class BucketMaxSD:
         self.counts[connection] = num
         self._add_to_bucket(num, connection)
 
-
     def incr(self, conn, d=1):
         self.set(conn, self.counts.get(conn, 0) + d)
 
@@ -50,7 +49,7 @@ class BucketMaxSD:
         num, s = self.buckets.peekitem(-1)
         return max(s), num
 
-    def density(self)-> float:
+    def density(self) -> float:
         if len(self.counts) == 0:
             return -1
         return len(self.buckets) / len(self.counts)
@@ -64,7 +63,9 @@ class BucketMaxSD:
         return self.bucket_create_destroy_count / self.set_count
 
     def message(self):
-        logging.info(f"map size: {len(self.counts)}, bucket average size: {self.average_bucket_size()}, churn: {self.churn()}")
+        logging.info(
+            f"map size: {len(self.counts)}, bucket average size: {self.average_bucket_size()}, churn: {self.churn()}"
+        )
 
     def __len__(self):
         return len(self.counts)
@@ -73,4 +74,3 @@ class BucketMaxSD:
         if not isinstance(item, tuple):
             return False
         return item in self.counts
-
