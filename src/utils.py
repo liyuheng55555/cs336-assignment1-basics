@@ -86,6 +86,7 @@ def chunk_split(
 ) -> list[str]:
     contents: list[str]
     if special_tokens is not None:
+        special_tokens.sort(key=lambda x: len(x), reverse=True)
         pattern = "|".join(re.escape(token) for token in special_tokens)
         pattern = "(" + pattern + ")"
         contents = [c for c in re.split(pattern, chunk) if c]
