@@ -1,4 +1,8 @@
 import json
+import codecs
+from collections import deque
+from multiprocessing import Process
+from multiprocessing import Queue
 from typing import Iterator, Iterable
 
 from src.type_define import TokenList, Connection
@@ -31,29 +35,6 @@ class Tokenizer:
         )
 
     @classmethod
-    def from_files(
-        cls,
-        vocab_filepath: str,
-        merges_filepath: str,
-        special_tokens: list[str] = None,
-    ):
-        """
-        :param vocab_filepath: json file, {"!": 0, "\"": 1, "#": 2, "$": 3}
-        :param merges_filepath: Ġ t\nĠ a\nh e
-        :param special_tokens:
-        :return:
-        """
-        vocab: dict[int, bytes] = {}
-        merge_rules: list[Connection] = []
-        with open(vocab_filepath, "r", encoding="utf-8") as file:
-            vocab = json.load(file)
-        with open(merges_filepath, "r", encoding="utf-8") as file:
-            line = file.readline()
-            a, b = line.split(" ")
-            merge_rules.append((a.encode("utf-8"), b.encode("utf-8")))
-        return Tokenizer(vocab, merge_rules, special_tokens)
-
-    @classmethod
     def from_json(cls, json_filepath: str):
         """从合并的 JSON 文件构建 Tokenizer。
 
@@ -65,12 +46,9 @@ class Tokenizer:
         vocab, merges, special_tokens = load_bpe_json(json_filepath)
         return cls(vocab, merges, special_tokens)
 
-    def encode(self, text: str) -> list[int]:
+    def encode_worker(self, queue: Queue, index: int, words: Iterable[str]):
         result: list[int] = []
-        word_list: list[str] = chunk_split(
-            text, special_tokens=self.special_tokens
-        )
-        for word in word_list:
+        for word in words:
             if word not in self.special_tokens_set:
                 token_list: TokenList = bytes_to_bytes_list(
                     word.encode("utf-8")
@@ -96,6 +74,38 @@ class Tokenizer:
                     result.append(self.reverse_vocab[token])
             else:
                 result.append(self.reverse_vocab[word.encode("utf-8")])
+        queue.put((index, result))
+
+    def encode(self, text: str) -> list[int]:
+
+        word_list: list[str] = chunk_split(
+            text, special_tokens=self.special_tokens
+        )
+        THRESHOLD = 10000
+
+        split_word_list = [word_list[i:i+THRESHOLD] for i in range(0, len(word_list), THRESHOLD)]
+
+        queue = Queue()
+        workers: deque[Process] = deque()
+        for i,words in enumerate(split_word_list):
+            worker = Process(target=self.encode_worker, args=(queue, i, words))
+            workers.append(worker)
+
+        for _ in range(6):
+            workers.pop().start()
+
+        result_list: list[list[int]] = [[]] * len(workers)
+        finished_worker_count = 0
+        while finished_worker_count < len(workers):
+            i, words = queue.get()
+            result_list[i] = words
+            if len(workers) != 0:
+                workers.pop().start()
+
+        result: list[int] = []
+        for x in result_list:
+            result.extend(x)
+
         return result
 
     def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
@@ -103,8 +113,12 @@ class Tokenizer:
             for code in self.encode(text):
                 yield code
 
-    def decode(self, ids: list[int]) -> str:
-        result: bytes = bytes()
-        for id in ids:
-            result += self.vocab[id]
-        return result.decode("utf-8", errors="replace")
+    def encode_file(self, input_path: str)  -> Iterator[int]:
+        pass
+
+    def decode(self, ids: Iterable[int]) -> str:
+        buf = bytearray()
+        for i in ids:
+            buf.extend(self.vocab[i])
+        return bytes(buf).decode("utf-8", errors="replace")
+
