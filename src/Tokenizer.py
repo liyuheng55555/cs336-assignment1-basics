@@ -1,5 +1,6 @@
 import json
 import codecs
+import logging
 from collections import deque
 from multiprocessing import Process
 from multiprocessing import Queue
@@ -46,7 +47,7 @@ class Tokenizer:
         vocab, merges, special_tokens = load_bpe_json(json_filepath)
         return cls(vocab, merges, special_tokens)
 
-    def encode_worker(self, queue: Queue, index: int, words: Iterable[str]):
+    def encode_impl(self, words: Iterable[str]) -> list[int]:
         result: list[int] = []
         for word in words:
             if word not in self.special_tokens_set:
@@ -74,14 +75,21 @@ class Tokenizer:
                     result.append(self.reverse_vocab[token])
             else:
                 result.append(self.reverse_vocab[word.encode("utf-8")])
-        queue.put((index, result))
+        return result
 
-    def encode(self, text: str) -> list[int]:
+
+    def encode_worker(self, queue: Queue, index: int, words: Iterable[str]):
+        queue.put((index, self.encode_impl(words)))
+
+    def encode_parallel(self, text: str) -> list[int]:
+
+        logging.info(f"encode开始")
 
         word_list: list[str] = chunk_split(
             text, special_tokens=self.special_tokens
         )
-        THRESHOLD = 10000
+
+        THRESHOLD = len(word_list) // 6 + 1
 
         split_word_list = [word_list[i:i+THRESHOLD] for i in range(0, len(word_list), THRESHOLD)]
 
@@ -91,13 +99,19 @@ class Tokenizer:
             worker = Process(target=self.encode_worker, args=(queue, i, words))
             workers.append(worker)
 
-        for _ in range(6):
+        worker_count = len(workers)
+
+        logging.info(f"{worker_count} worker 生成完毕")
+
+        for _ in range(min(6, worker_count)):
             workers.pop().start()
 
-        result_list: list[list[int]] = [[]] * len(workers)
+        result_list: list[list[int]] = [[]] * worker_count
         finished_worker_count = 0
-        while finished_worker_count < len(workers):
+        while finished_worker_count < worker_count:
             i, words = queue.get()
+            finished_worker_count += 1
+            logging.info(f"{finished_worker_count} worker 执行完毕")
             result_list[i] = words
             if len(workers) != 0:
                 workers.pop().start()
@@ -107,6 +121,20 @@ class Tokenizer:
             result.extend(x)
 
         return result
+
+
+    def encode_single(self, text: str) -> list[int]:
+        word_list: list[str] = chunk_split(
+            text, special_tokens=self.special_tokens
+        )
+
+        return self.encode_impl(word_list)
+
+
+    def encode(self, text: str) -> list[int]:
+        return self.encode_single(text)
+        # return self.encode_parallel(text)
+
 
     def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
         for text in iterable:

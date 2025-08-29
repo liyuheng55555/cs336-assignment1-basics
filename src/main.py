@@ -1,3 +1,4 @@
+import logging
 from time import perf_counter
 
 from cs336_basics.pretokenization_example import find_chunk_boundaries
@@ -6,8 +7,12 @@ from src.type_define import GB
 
 if __name__ == '__main__':
 
-    # input_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt"
-    input_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_valid.txt"
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+
+    input_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt"
+    # input_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_valid.txt"
     # tokenizer_file_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.json"
     tokenizer_file_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_train.json"
     with open(input_path, "rb") as f:
