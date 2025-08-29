@@ -53,6 +53,18 @@ class Tokenizer:
             merge_rules.append((a.encode("utf-8"), b.encode("utf-8")))
         return Tokenizer(vocab, merge_rules, special_tokens)
 
+    @classmethod
+    def from_json(cls, json_filepath: str):
+        """从合并的 JSON 文件构建 Tokenizer。
+
+        该 JSON 文件由 bpe_train.py 写出，包含 vocab（bytes 以整型数组表示）、
+        merges（两端 bytes 同样为整型数组）以及可选的 special_tokens。
+        """
+        from src.bpe_train import load_bpe_json
+
+        vocab, merges, special_tokens = load_bpe_json(json_filepath)
+        return cls(vocab, merges, special_tokens)
+
     def encode(self, text: str) -> list[int]:
         result: list[int] = []
         word_list: list[str] = chunk_split(

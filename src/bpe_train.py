@@ -291,6 +291,37 @@ def bpe_train(
     return vocab.build_dict(), merge_rules
 
 
+def load_bpe_json(json_filepath: str) -> tuple[dict[int, bytes], list[Connection], list[str] | None]:
+    """
+    从由本文件写出的合并 JSON（同名 .json）加载 vocab 与 merges。
+
+    JSON 结构示例：
+    {
+      "input_path": ".../TinyStoriesV2-GPT4-train.txt",
+      "vocab_size": 10000,
+      "special_tokens": ["<|endoftext|>"],
+      "vocab": {"0": [116, 101, ...], ...},
+      "merges": [ [[110,...],[101,...]], ... ]
+    }
+
+    返回值：
+    - vocab: dict[int, bytes]
+    - merges: list[tuple[bytes, bytes]]
+    - special_tokens: list[str] | None
+    """
+    with open(json_filepath, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    raw_vocab = data.get("vocab", {})
+    vocab: dict[int, bytes] = {int(k): bytes(v) for k, v in raw_vocab.items()}
+
+    raw_merges = data.get("merges", [])
+    merges: list[Connection] = [(bytes(a), bytes(b)) for a, b in raw_merges]
+
+    special_tokens = data.get("special_tokens")
+    return vocab, merges, special_tokens
+
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
@@ -303,11 +334,30 @@ if __name__ == "__main__":
     # 测试缓存功能 - 使用小数据集
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/bpe_example.txt", 270, ["<|endoftext|>"])
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["<|endoftext|>"])
+    special_tokens = ["<|endoftext|>"]
     vocab, merges = bpe_train(
         input_path,
         vocab_size,
-        ["<|endoftext|>"],
+        special_tokens,
     )
+    # 序列化 vocab 与 merges 到与 input_path 同名的 .json 文件
+    try:
+        out_json_path = os.path.splitext(input_path)[0] + ".json"
+
+        # 使用整数数组表示 bytes，避免 base64，保持 JSON 可读、可无损还原
+        serialized = {
+            "input_path": input_path,
+            "vocab_size": vocab_size,
+            "special_tokens": special_tokens,
+            "vocab": {str(k): list(v) for k, v in vocab.items()},  # bytes -> [int]
+            "merges": [[list(a), list(b)] for (a, b) in merges],    # (bytes, bytes) -> [[int],[int]]
+        }
+
+        with open(out_json_path, "w", encoding="utf-8") as f:
+            json.dump(serialized, f, ensure_ascii=False)
+        logging.info(f"已保存 BPE 结果到: {out_json_path}")
+    except Exception as e:
+        logging.error(f"保存 BPE 结果到 JSON 失败: {e}")
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_valid.txt", 32000, ["<|endoftext|>"])
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_train.txt", 32000, ["<|endoftext|>"])
     # print(merge)
