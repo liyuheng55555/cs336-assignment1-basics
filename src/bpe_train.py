@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import pickle
@@ -17,6 +18,7 @@ from src.utils import (
     merge_by_one_rule,
     bytes_list_to_connections,
 )
+from tests.conftest import vocab_size
 
 
 def find_best_connection(
@@ -294,13 +296,16 @@ if __name__ == "__main__":
         level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
+    input_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt"
+    vocab_size = 10000
+
     main_start = perf_counter()
     # 测试缓存功能 - 使用小数据集
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/bpe_example.txt", 270, ["<|endoftext|>"])
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-valid.txt", 512, ["<|endoftext|>"])
-    _, merge = bpe_train(
-        "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt",
-        10000,
+    vocab, merges = bpe_train(
+        input_path,
+        vocab_size,
         ["<|endoftext|>"],
     )
     # _, merge = bpe_train("/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_valid.txt", 32000, ["<|endoftext|>"])
@@ -308,5 +313,7 @@ if __name__ == "__main__":
     # print(merge)
     main_end = perf_counter()
     print(f"总耗时: {main_end - main_start:.6f} 秒")
+
+
 
     # 2025-08-24 21:52:04,794 - INFO - 预分词结果已缓存

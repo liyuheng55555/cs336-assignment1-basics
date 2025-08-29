@@ -10,7 +10,7 @@ import torch
 from torch import Tensor
 
 from src.Tokenizer import Tokenizer
-from src.bpe import bpe_train
+from src.bpe_train import bpe_train
 
 
 def run_linear(

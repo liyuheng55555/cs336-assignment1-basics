@@ -92,7 +92,6 @@ class Tokenizer:
                 yield code
 
     def decode(self, ids: list[int]) -> str:
-        result: str = ""
         result: bytes = bytes()
         for id in ids:
             result += self.vocab[id]
