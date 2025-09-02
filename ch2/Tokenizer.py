@@ -6,8 +6,8 @@ from multiprocessing import Process
 from multiprocessing import Queue
 from typing import Iterator, Iterable
 
-from src.type_define import TokenList, Connection
-from src.utils import (
+from ch2.type_define import TokenList, Connection
+from ch2.utils import (
     chunk_split,
     bytes_to_bytes_list,
     bytes_list_to_connections,
@@ -42,7 +42,7 @@ class Tokenizer:
         该 JSON 文件由 bpe_train.py 写出，包含 vocab（bytes 以整型数组表示）、
         merges（两端 bytes 同样为整型数组）以及可选的 special_tokens。
         """
-        from src.bpe_train import load_bpe_json
+        from ch2.bpe_train import load_bpe_json
 
         vocab, merges, special_tokens = load_bpe_json(json_filepath)
         return cls(vocab, merges, special_tokens)

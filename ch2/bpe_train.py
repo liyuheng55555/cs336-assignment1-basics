@@ -10,10 +10,10 @@ from time import perf_counter
 import regex as re
 
 from cs336_basics.pretokenization_example import find_chunk_boundaries
-from src.BucketMaxSD import BucketMaxSD
-from src.Vocab import Vocab
-from src.type_define import Index, Connection, Num, TokenList, GB, GPT2_PAT
-from src.utils import (
+from ch2.BucketMaxSD import BucketMaxSD
+from ch2.Vocab import Vocab
+from ch2.type_define import Index, Connection, Num, TokenList, GB, GPT2_PAT
+from ch2.utils import (
     bytes_to_bytes_list,
     merge_by_one_rule,
     bytes_list_to_connections,

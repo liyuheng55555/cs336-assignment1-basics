@@ -2,7 +2,7 @@ import logging
 
 from sortedcontainers import SortedDict
 
-from src.type_define import Connection, Num
+from ch2.type_define import Connection, Num
 
 
 class BucketMaxSD:

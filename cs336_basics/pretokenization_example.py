@@ -2,7 +2,7 @@ import logging
 import os
 from typing import BinaryIO
 
-from src.type_define import GB
+from ch2.type_define import GB
 
 
 def find_chunk_boundaries(

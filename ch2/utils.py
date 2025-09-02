@@ -1,4 +1,4 @@
-from src.type_define import Connection, GPT2_PAT
+from ch2.type_define import Connection, GPT2_PAT
 import regex as re
 
 

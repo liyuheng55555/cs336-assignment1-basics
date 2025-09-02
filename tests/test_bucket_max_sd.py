@@ -1,6 +1,6 @@
 import pytest
-from src.BucketMaxSD import BucketMaxSD
-from src.type_define import Connection
+from ch2.BucketMaxSD import BucketMaxSD
+from ch2.type_define import Connection
 
 
 class TestBucketMaxSD:

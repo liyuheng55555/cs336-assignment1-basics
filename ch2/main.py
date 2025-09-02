@@ -2,8 +2,8 @@ import logging
 from time import perf_counter
 
 from cs336_basics.pretokenization_example import find_chunk_boundaries
-from src.Tokenizer import Tokenizer
-from src.type_define import GB
+from ch2.Tokenizer import Tokenizer
+from ch2.type_define import GB
 
 if __name__ == '__main__':
 
