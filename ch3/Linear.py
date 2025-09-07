@@ -2,6 +2,7 @@ import math
 
 import torch
 from torch import nn
+from einops import rearrange, einsum
 
 
 class Linear(nn.Module):
@@ -13,4 +14,4 @@ class Linear(nn.Module):
 
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.einsum("o i, ... i -> ... o", self.w.data, x)
+        return einsum(self.w.data, x, "d_out d_in, ... d_in -> ... d_out")
