@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from typing import IO, Any, BinaryIO
 from collections.abc import Iterable
+
+from ch3.RMSNorm import RMSNorm
 from jaxtyping import Float, Int
 
 import numpy.typing as npt
@@ -387,7 +389,9 @@ def run_rmsnorm(
         Float[Tensor,"... d_model"]: Tensor of with the same shape as `in_features` with the output of running
         RMSNorm of the `in_features`.
     """
-    raise NotImplementedError
+
+    rms = RMSNorm(d_model, eps, weights)
+    return rms.forward(in_features)
 
 
 def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
