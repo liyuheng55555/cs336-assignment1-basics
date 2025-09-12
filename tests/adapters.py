@@ -4,6 +4,7 @@ import os
 from typing import IO, Any, BinaryIO
 from collections.abc import Iterable
 
+from ch3.PositionWiseFeedForward import PositionWiseFeedForward
 from ch3.RMSNorm import RMSNorm
 from jaxtyping import Float, Int
 
@@ -94,7 +95,8 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    module = PositionWiseFeedForward(d_ff, w1_weight, w2_weight, w3_weight)
+    return module.forward(in_features)
 
 
 def run_scaled_dot_product_attention(
