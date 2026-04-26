@@ -5,7 +5,9 @@ from typing import IO, Any, BinaryIO
 from collections.abc import Iterable
 
 from ch3.PositionWiseFeedForward import PositionWiseFeedForward
-from ch3.RMSNorm import RMSNorm
+from ch3.PositionWiseFeedForward1 import PositionWiseFeedForward1
+from ch3.RMSNorm1 import RMSNorm1
+from ch3.RotaryPositionalEmbedding import RotaryPositionalEmbedding
 from jaxtyping import Float, Int
 
 import numpy.typing as npt
@@ -95,7 +97,8 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    module = PositionWiseFeedForward(d_ff, w1_weight, w2_weight, w3_weight)
+    module = PositionWiseFeedForward1(d_model, d_ff, w1_weight, w2_weight, w3_weight)
+    # module = PositionWiseFeedForward(d_ff, w1_weight, w2_weight, w3_weight)
     return module.forward(in_features)
 
 
@@ -213,7 +216,8 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    raise NotImplementedError
+    rope = RotaryPositionalEmbedding(theta, d_k, max_seq_len)
+    return rope.forward(in_query_or_key, token_positions)
 
 
 def run_transformer_block(
@@ -392,7 +396,7 @@ def run_rmsnorm(
         RMSNorm of the `in_features`.
     """
 
-    rms = RMSNorm(d_model, eps, weights)
+    rms = RMSNorm1(d_model, weights, eps)
     return rms.forward(in_features)
 
 
