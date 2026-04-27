@@ -12,9 +12,12 @@ class RMSNorm1(nn.Module):
         self.g: nn.Parameter = nn.Parameter(weights)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        in_dtype = x.dtype
+        x = x.to(torch.float32)
+
         x2 = x*x
         x2sum = einops.einsum(x2, "... d_model -> ...")
         x2sum += self.eps
         rms = ((x2sum + self.eps) / self.d_model).sqrt()
         rms_1 = 1 / rms
-        return self.g * einops.einsum(x, rms_1, "batch sequence d_model, batch sequence -> batch sequence d_model")
+        return self.g * einops.einsum(x, rms_1, "batch sequence d_model, batch sequence -> batch sequence d_model").to(in_dtype)

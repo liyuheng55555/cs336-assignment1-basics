@@ -15,3 +15,4 @@ class Linear(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return einsum(self.w.data, x, "d_out d_in, ... d_in -> ... d_out")
+        # return torch.nn.functional.linear(x, self.w)

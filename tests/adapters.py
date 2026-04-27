@@ -2,13 +2,6 @@ from __future__ import annotations
 
 import os
 from collections.abc import Iterable
-
-from ch3.MultiHeadAttention import MultiHeadAttention, MultiHeadAttentionWithRope
-from ch3.PositionWiseFeedForward import PositionWiseFeedForward
-from ch3.PositionWiseFeedForward1 import PositionWiseFeedForward1
-from ch3.RMSNorm1 import RMSNorm1
-from ch3.RotaryPositionalEmbedding import RotaryPositionalEmbedding
-from jaxtyping import Float, Int
 from typing import IO, Any, BinaryIO
 
 import numpy.typing as npt
@@ -19,11 +12,15 @@ from torch import Tensor
 from ch2.Tokenizer import Tokenizer
 from ch2.bpe_train import bpe_train
 from ch3.Embedding import Embedding
-
 from ch3.Linear import Linear
+from ch3.MultiHeadAttention import MultiHeadAttention, MultiHeadAttentionWithRope
+from ch3.PositionWiseFeedForward1 import PositionWiseFeedForward1
+from ch3.RMSNorm1 import RMSNorm1
+from ch3.RotaryPositionalEmbedding import RotaryPositionalEmbedding
 from ch3.ScaledDotProductAttention import scaled_dot_product_attention
 from ch3.Softmax import softmax
 from ch3.TransformerBlock import TransformerBlock
+from ch3.TransformerLM import TransformerLM
 
 
 def run_linear(
@@ -380,7 +377,9 @@ def run_transformer_lm(
         Float[Tensor, "batch_size sequence_length vocab_size"]: Tensor with the predicted unnormalized
         next-word distribution for each token.
     """
-    raise NotImplementedError
+    module = TransformerLM(vocab_size, context_length, d_model, num_layers, num_heads, d_ff, rope_theta, weights)
+    return module.forward(in_indices)
+
 
 
 def run_rmsnorm(

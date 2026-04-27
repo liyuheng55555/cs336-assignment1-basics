@@ -32,9 +32,9 @@ class TransformerBlock(nn.Module):
             num_heads,
             max_seq_len,
             theta,
-            weights['attn.q_proj.weight'],
-            weights['attn.k_proj.weight'],
-            weights['attn.v_proj.weight'],
+            weights['attn.q_proj.weight'     ],
+            weights['attn.k_proj.weight'     ],
+            weights['attn.v_proj.weight'     ],
             weights['attn.output_proj.weight']
         )
 

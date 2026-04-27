@@ -37,8 +37,8 @@ class RotaryPositionalEmbedding(torch.nn.Module):
             token_positions: Int[Tensor, " ... sequence_length"],
     ) -> Float[Tensor, " ... sequence_length d_k"]:
         # 需要想想怎么优雅化
-        COS = self.cos[token_positions] # [... sequence_length self.d // 2]
-        SIN = self.sin[token_positions]
+        COS = self.cos[token_positions].to(x.device) # [... sequence_length self.d // 2]
+        SIN = self.sin[token_positions].to(x.device)
 
         a = x[..., ::2]
         b = x[..., 1::2]
