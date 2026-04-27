@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterable
 
+from ch3.MultiHeadAttention import MultiHeadAttention
 from ch3.PositionWiseFeedForward import PositionWiseFeedForward
 from ch3.PositionWiseFeedForward1 import PositionWiseFeedForward1
 from ch3.RMSNorm1 import RMSNorm1
@@ -157,7 +158,8 @@ def run_multihead_self_attention(
         Float[Tensor, " ... sequence_length d_model"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    module = MultiHeadAttention(d_model, num_heads, q_proj_weight, k_proj_weight, v_proj_weight, o_proj_weight)
+    return module.forward(in_features)
 
 
 def run_multihead_self_attention_with_rope(
