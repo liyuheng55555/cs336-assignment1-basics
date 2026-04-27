@@ -19,6 +19,6 @@ class RMSNorm(torch.nn.Module):
         return result.to(in_dtype)
 
     def _rms(self, x: torch.Tensor) -> torch.Tensor:
-        sqaure = x * x + self.eps
-        sum = einops.einsum(sqaure, "... d_model -> ...")
+        square = x * x + self.eps
+        sum = einops.einsum(square, "... d_model -> ...")
         return (sum / x.shape[-1]) ** 0.5
