@@ -17,7 +17,6 @@ class RMSNorm1(nn.Module):
 
         x2 = x*x
         x2sum = einops.einsum(x2, "... d_model -> ...")
-        x2sum += self.eps
-        rms = ((x2sum + self.eps) / self.d_model).sqrt()
+        rms = (x2sum / self.d_model + self.eps).sqrt()
         rms_1 = 1 / rms
         return self.g * einops.einsum(x, rms_1, "batch sequence d_model, batch sequence -> batch sequence d_model").to(in_dtype)
