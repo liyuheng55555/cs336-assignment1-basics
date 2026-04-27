@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterable
 
-from ch3.MultiHeadAttention import MultiHeadAttention
+from ch3.MultiHeadAttention import MultiHeadAttention, MultiHeadAttentionWithRope
 from ch3.PositionWiseFeedForward import PositionWiseFeedForward
 from ch3.PositionWiseFeedForward1 import PositionWiseFeedForward1
 from ch3.RMSNorm1 import RMSNorm1
@@ -23,6 +23,7 @@ from ch3.Embedding import Embedding
 from ch3.Linear import Linear
 from ch3.ScaledDotProductAttention import scaled_dot_product_attention
 from ch3.Softmax import softmax
+from ch3.TransformerBlock import TransformerBlock
 
 
 def run_linear(
@@ -199,7 +200,8 @@ def run_multihead_self_attention_with_rope(
         Float[Tensor, " ... sequence_length d_model"]: Tensor with the output of running your optimized, batched multi-headed attention
         implementation with the given QKV projection weights and input features.
     """
-    raise NotImplementedError
+    module = MultiHeadAttentionWithRope(d_model, num_heads, max_seq_len, theta, q_proj_weight, k_proj_weight, v_proj_weight, o_proj_weight)
+    return module.forward(in_features, token_positions)
 
 
 def run_rope(
@@ -221,7 +223,7 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    rope = RotaryPositionalEmbedding(theta, d_k, max_seq_len)
+    rope = RotaryPositionalEmbedding(d_k, max_seq_len, theta)
     return rope.forward(in_query_or_key, token_positions)
 
 
@@ -295,7 +297,8 @@ def run_transformer_block(
         Float[Tensor, "batch sequence_length d_model"] Tensor with the output of
         running the Transformer block on the input features while using RoPE.
     """
-    raise NotImplementedError
+    transformer_block = TransformerBlock(d_model, num_heads, d_ff, max_seq_len, weights)
+    return transformer_block.forward(in_features)
 
 
 def run_transformer_lm(
