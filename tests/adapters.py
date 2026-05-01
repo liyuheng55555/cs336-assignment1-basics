@@ -21,6 +21,7 @@ from ch3.Softmax import softmax
 from ch3.TransformerBlock import TransformerBlock
 from ch3.TransformerLM import TransformerLM
 from ch4.cross_entropy import cross_entropy
+from ch4.optimizer_AdamW import AdamW
 
 
 def run_linear(
@@ -495,7 +496,7 @@ def get_adamw_cls() -> Any:
     """
     Returns a torch.optim.Optimizer that implements AdamW.
     """
-    raise NotImplementedError
+    return AdamW
 
 
 def run_get_lr_cosine_schedule(
