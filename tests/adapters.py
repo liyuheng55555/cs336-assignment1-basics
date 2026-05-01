@@ -13,11 +13,10 @@ from ch2.Tokenizer import Tokenizer
 from ch2.bpe_train import bpe_train
 from ch3.Embedding import Embedding
 from ch3.Linear import Linear
-from ch3.MultiHeadAttention import MultiHeadAttention, MultiHeadAttentionWithRope
+from ch3.MultiHeadAttention import MultiHeadAttention, MultiHeadAttentionWithRope, scaled_dot_product_attention
 from ch3.PositionWiseFeedForward1 import PositionWiseFeedForward1
 from ch3.RMSNorm1 import RMSNorm1
 from ch3.RotaryPositionalEmbedding import RotaryPositionalEmbedding
-from ch3.ScaledDotProductAttention import scaled_dot_product_attention
 from ch3.Softmax import softmax
 from ch3.TransformerBlock import TransformerBlock
 from ch3.TransformerLM import TransformerLM
