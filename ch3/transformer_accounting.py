@@ -78,9 +78,9 @@ def calculate_parameters_and_flops(
 def calculate_dff(d_model: int) -> int:
     return int(d_model * 8 / 3) // 64 * 64
 
-calculate_parameters_and_flops("XL", 50257, 1024, 48, 1600, 25, 4288)
-calculate_parameters_and_flops("small", 50257, 1024, 12, 768, 12, calculate_dff(768))
-calculate_parameters_and_flops("medium", 50257, 1024, 24, 1024, 16, calculate_dff(1024))
-calculate_parameters_and_flops("large", 50257, 1024, 36, 1280, 20, calculate_dff(1280))
-
-calculate_parameters_and_flops("XL long context", 50257, 16384, 48, 1600, 25, 4288)
+# calculate_parameters_and_flops("XL", 50257, 1024, 48, 1600, 25, 4288)
+# calculate_parameters_and_flops("small", 50257, 1024, 12, 768, 12, calculate_dff(768))
+# calculate_parameters_and_flops("medium", 50257, 1024, 24, 1024, 16, calculate_dff(1024))
+# calculate_parameters_and_flops("large", 50257, 1024, 36, 1280, 20, calculate_dff(1280))
+#
+# calculate_parameters_and_flops("XL long context", 50257, 16384, 48, 1600, 25, 4288)
