@@ -24,6 +24,7 @@ from ch4.cross_entropy import cross_entropy
 from ch4.gradient_clipping import gradient_clipping
 from ch4.optimizer_AdamW import AdamW
 from ch4.lr_cosine_schedule import lr_cosine_schedule
+from ch5.get_batch import get_batch
 
 
 def run_linear(
@@ -444,7 +445,7 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
-    raise NotImplementedError
+    return get_batch(dataset, batch_size, context_length)
 
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
