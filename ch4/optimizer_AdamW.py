@@ -4,6 +4,9 @@ import torch.optim
 from collections.abc import Callable, Iterable
 from typing import Optional
 
+from ch3.transformer_accounting import calculate_parameters
+
+
 class AdamW(torch.optim.Optimizer):
     def __init__(
             self,
@@ -53,3 +56,13 @@ class AdamW(torch.optim.Optimizer):
                 state["t"] = t + 1
                 state["m"] = m
                 state["v"] = v
+
+
+def adamw_accounting(
+        vocab_size: int,
+        context_length: int,
+        num_layers: int,
+        d_model: int,
+        num_heads: int,
+):
+    pass

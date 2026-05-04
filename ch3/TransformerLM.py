@@ -54,6 +54,20 @@ class TransformerLM(nn.Module):
         return x
 
 
+    @staticmethod
+    def activations(
+            vocab_size: int,
+            context_length: int,
+            d_model: int,
+            num_layers: int,
+            num_heads: int,
+            d_ff: int,
+    ):
+        pass
+
+
+
+
     def extract_weights(self, weights: dict[str, Tensor], id: int):
         keys = [
             'attn.q_proj.weight',

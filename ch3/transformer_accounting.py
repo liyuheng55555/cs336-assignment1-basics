@@ -6,7 +6,7 @@ def calculate_parameters(
         d_model: int,
         num_heads: int,
         d_ff: int
-):
+) -> int:
     embedding_block_params = vocab_size * d_model
     norm_params = d_model
     multihead_attention_params = 4 * d_model * d_model
@@ -18,6 +18,8 @@ def calculate_parameters(
     GB = byte / 1024 / 1024 / 1024
 
     print(f"params:{transformer_lm_params}\nmemory: {GB} GB")
+
+    return transformer_lm_params
 
 
 def mat_mul(s1:int, s2:int, s3:int):
