@@ -23,4 +23,4 @@ def get_batch(
     data_offsets = np.arange(0, context_length)
     data_indexes = starts[:, None] + data_offsets[None, :]
     target_indexes = starts[:, None] + (data_offsets[None, :] + 1)
-    return torch.tensor(dataset[data_indexes], device=device), torch.tensor(dataset[target_indexes], device=device)
+    return torch.tensor(dataset[data_indexes], device=device, dtype=torch.int), torch.tensor(dataset[target_indexes], device=device, dtype=torch.int)
