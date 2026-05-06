@@ -72,7 +72,7 @@ class MultiHeadAttentionWithRope(nn.Module):
         self.W_k : nn.Parameter = nn.Parameter(k_proj_weight)
         self.W_v : nn.Parameter = nn.Parameter(v_proj_weight)
         self.W_o : nn.Parameter = nn.Parameter(o_proj_weight)
-        self.rope = RotaryPositionalEmbedding(self.d_k, max_seq_len, theta)
+        self.rope = RotaryPositionalEmbedding(self.d_k, max_seq_len, theta, device=self.W_k.device)
 
 
     def forward(
@@ -93,7 +93,7 @@ class MultiHeadAttentionWithRope(nn.Module):
 
         seq_len : int = in_features.shape[-2]
 
-        mask = torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool))
+        mask = torch.tril(torch.ones(seq_len, seq_len, dtype=torch.bool)).to(in_features.device)
 
         attention = scaled_dot_product_attention(rope_q, rope_k, multi_v, mask)
 

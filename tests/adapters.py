@@ -299,7 +299,7 @@ def run_transformer_block(
         running the Transformer block on the input features while using RoPE.
     """
     transformer_block = TransformerBlock(d_model, num_heads, d_ff, max_seq_len, theta, weights)
-    return transformer_block.forward(in_features, torch.arange(0, in_features.shape[-2]))
+    return transformer_block.forward(in_features, torch.arange(0, in_features.shape[-2]).to(in_features.device))
 
 
 def run_transformer_lm(

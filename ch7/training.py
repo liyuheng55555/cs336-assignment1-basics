@@ -33,6 +33,8 @@ WEIGHT_DECAY = 0.01
 # GRADIENT_CLIPPING
 L2_NORM = 1.0
 
+DEVICE = torch.device("mps")
+
 torch.manual_seed(69)
 
 logging.basicConfig(
@@ -41,21 +43,21 @@ logging.basicConfig(
 )
 
 weights = {
-    'token_embeddings.weight': torch.empty(VOCAB_SIZE, D_MODEL).normal_(mean=0.0, std=0.02),
-    'ln_final.weight': torch.ones(D_MODEL),
-    'lm_head.weight': torch.empty(VOCAB_SIZE, D_MODEL).normal_(mean=0, std=0.02),
+    'token_embeddings.weight': torch.empty(VOCAB_SIZE, D_MODEL, device=DEVICE).normal_(mean=0.0, std=0.02),
+    'ln_final.weight': torch.ones(D_MODEL, device=DEVICE),
+    'lm_head.weight': torch.empty(VOCAB_SIZE, D_MODEL, device=DEVICE).normal_(mean=0, std=0.02),
 }
 for i in range(NUM_LAYERS):
     layer_weights = {
-        f'layers.{i}.attn.q_proj.weight': torch.empty(D_MODEL, D_MODEL).normal_(mean=0.0, std=0.02),
-        f'layers.{i}.attn.k_proj.weight': torch.empty(D_MODEL, D_MODEL).normal_(mean=0.0, std=0.02),
-        f'layers.{i}.attn.v_proj.weight': torch.empty(D_MODEL, D_MODEL).normal_(mean=0.0, std=0.02),
-        f'layers.{i}.attn.output_proj.weight': torch.empty(D_MODEL, D_MODEL).normal_(mean=0.0, std=0.02),
-        f'layers.{i}.ffn.w1.weight': torch.empty(D_FF, D_MODEL).normal_(mean=0.0, std=0.02),
-        f'layers.{i}.ffn.w2.weight': torch.empty(D_MODEL, D_FF).normal_(mean=0.0, std=0.02),
-        f'layers.{i}.ffn.w3.weight': torch.empty(D_FF, D_MODEL).normal_(mean=0.0, std=0.02),
-        f'layers.{i}.ln1.weight': torch.ones(D_MODEL),
-        f'layers.{i}.ln2.weight': torch.ones(D_MODEL),
+        f'layers.{i}.attn.q_proj.weight': torch.empty(D_MODEL, D_MODEL, device=DEVICE).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.attn.k_proj.weight': torch.empty(D_MODEL, D_MODEL, device=DEVICE).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.attn.v_proj.weight': torch.empty(D_MODEL, D_MODEL, device=DEVICE).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.attn.output_proj.weight': torch.empty(D_MODEL, D_MODEL, device=DEVICE).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.ffn.w1.weight': torch.empty(D_FF, D_MODEL, device=DEVICE).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.ffn.w2.weight': torch.empty(D_MODEL, D_FF, device=DEVICE).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.ffn.w3.weight': torch.empty(D_FF, D_MODEL, device=DEVICE).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.ln1.weight': torch.ones(D_MODEL, device=DEVICE),
+        f'layers.{i}.ln2.weight': torch.ones(D_MODEL, device=DEVICE),
     }
     weights |= layer_weights
 
@@ -75,7 +77,8 @@ optimizer = AdamW(
     lr=LEARNING_RATE,
     betas=BETAS,
     weight_decay=WEIGHT_DECAY,
-    eps=EPS
+    eps=EPS,
+    device=DEVICE
 )
 
 # for param in model.parameters():
@@ -90,7 +93,7 @@ checkpoint_dir = Path("checkpoints")
 
 # batch, target = get_batch(data, batch_size=32, context_length=CONTEXT_LENGTH, device="cpu")
 for iteration in range(TOTAL_STEPS):
-    batch, target = get_batch(data, batch_size=32, context_length=CONTEXT_LENGTH, device="cpu")
+    batch, target = get_batch(data, batch_size=32, context_length=CONTEXT_LENGTH, device="mps")
     result = model.forward(batch.long())
     result = einops.rearrange(result, "batch context_length vocab_size -> (batch context_length) vocab_size")
     target1 = einops.rearrange(target, "batch context_length -> (batch context_length)")

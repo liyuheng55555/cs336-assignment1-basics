@@ -15,12 +15,14 @@ class AdamW(torch.optim.Optimizer):
             weight_decay: float,
             betas: tuple[float, float],
             eps: float,
+            device: torch.device,
     ):
         defaults = {
             "lr": lr,
             "weight_decay": weight_decay,
             "betas": betas,
             "eps": eps,
+            "device": device,
         }
         super().__init__(params, defaults)
 
@@ -40,8 +42,8 @@ class AdamW(torch.optim.Optimizer):
 
                 state = self.state[p]
                 t = state.get("t", 1)
-                m: torch.Tensor = state.get("m", torch.zeros(p.shape))
-                v: torch.Tensor = state.get("v", torch.zeros(p.shape))
+                m: torch.Tensor = state.get("m", torch.zeros(p.shape, device=group["device"]))
+                v: torch.Tensor = state.get("v", torch.zeros(p.shape, device=group["device"]))
                 g = p.grad.data
 
                 p.data -= lr * weight_decay * p.data

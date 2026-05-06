@@ -18,8 +18,8 @@ class RotaryPositionalEmbedding(torch.nn.Module):
         self.max_seq_len = max_seq_len
 
         # [max_seq_len, self.d]
-        self.cos = torch.zeros(max_seq_len, self.d // 2)
-        self.sin = torch.zeros(max_seq_len, self.d // 2)
+        self.cos = torch.zeros(max_seq_len, self.d // 2).to(device)
+        self.sin = torch.zeros(max_seq_len, self.d // 2).to(device)
         self.cal_cos_sin()
 
 
