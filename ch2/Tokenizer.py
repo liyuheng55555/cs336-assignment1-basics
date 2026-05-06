@@ -236,3 +236,6 @@ class Tokenizer:
         for i in ids:
             buf.extend(self.vocab[i])
         return bytes(buf).decode("utf-8", errors="replace")
+
+    def decode_one(self, id: int) -> bytes:
+        return self.vocab[id]

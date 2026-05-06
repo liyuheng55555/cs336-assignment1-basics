@@ -4,13 +4,16 @@ from pathlib import Path
 import einops
 import torch
 import numpy as np
+from jaxtyping import Float
+from torch import Tensor
 
+from ch2.Tokenizer import Tokenizer
 from ch3.Softmax import softmax
 from ch3.TransformerLM import TransformerLM
 from ch4.cross_entropy import cross_entropy
 from ch4.gradient_clipping import gradient_clipping
 from ch4.optimizer_AdamW import AdamW
-from ch5.checkpoint import save_checkpoint
+from ch5.checkpoint import save_checkpoint, load_checkpoint
 from ch5.get_batch import get_batch
 from tests.test_tokenizer import VOCAB_PATH
 
@@ -84,32 +87,56 @@ optimizer = AdamW(
 # for param in model.parameters():
 #     print(param.shape)
 
-for name, param in model.named_parameters():
-    print(name, param.shape)
+def train():
+    data_path = Path("../ch2/tokenized_tiny_story/result.npy")
+    data = np.load(data_path, mmap_mode="r")
+    checkpoint_dir = Path("checkpoints")
 
-data_path = Path("../ch2/tokenized_tiny_story/result.npy")
-data = np.load(data_path, mmap_mode="r")
-checkpoint_dir = Path("checkpoints")
+    # batch, target = get_batch(data, batch_size=32, context_length=CONTEXT_LENGTH, device="cpu")
+    for iteration in range(TOTAL_STEPS):
+        batch, target = get_batch(data, batch_size=32, context_length=CONTEXT_LENGTH, device="mps")
+        result = model.forward(batch.long())
+        result = einops.rearrange(result, "batch context_length vocab_size -> (batch context_length) vocab_size")
+        target1 = einops.rearrange(target, "batch context_length -> (batch context_length)")
+        entropy: torch.Tensor = cross_entropy(result, target1)
+        entropy.backward()
+        gradient_clipping(model.parameters(), L2_NORM)
 
-# batch, target = get_batch(data, batch_size=32, context_length=CONTEXT_LENGTH, device="cpu")
-for iteration in range(TOTAL_STEPS):
-    batch, target = get_batch(data, batch_size=32, context_length=CONTEXT_LENGTH, device="mps")
-    result = model.forward(batch.long())
-    result = einops.rearrange(result, "batch context_length vocab_size -> (batch context_length) vocab_size")
-    target1 = einops.rearrange(target, "batch context_length -> (batch context_length)")
-    entropy: torch.Tensor = cross_entropy(result, target1)
-    entropy.backward()
-    gradient_clipping(model.parameters(), L2_NORM)
+        optimizer.step()
+        optimizer.zero_grad()
 
-    optimizer.step()
-    optimizer.zero_grad()
-
-    if iteration % 1000 == 0:
-        logging.info("saving checkpoint...")
-        ckpt_path = checkpoint_dir/f"{iteration}.ckpt"
-        save_checkpoint(model, optimizer, iteration, ckpt_path)
-        logging.info(f"checkpoint {ckpt_path.__str__()} saved")
-    logging.info(f"iteration: {iteration:06d}  loss: {entropy.item()}")
+        if iteration % 1000 == 0:
+            logging.info("saving checkpoint...")
+            ckpt_path = checkpoint_dir/f"{iteration}.ckpt"
+            save_checkpoint(model, optimizer, iteration, ckpt_path)
+            logging.info(f"checkpoint {ckpt_path.__str__()} saved")
+        logging.info(f"iteration: {iteration:06d}  loss: {entropy.item()}")
 
 
-save_checkpoint(model, optimizer, TOTAL_STEPS, checkpoint_dir/f"{TOTAL_STEPS}.ckpt")
+    save_checkpoint(model, optimizer, TOTAL_STEPS, checkpoint_dir/f"{TOTAL_STEPS}.ckpt")
+
+
+def decode(output: Float[Tensor, "context_length vocab_size"], vocab: list[bytes]):
+    useful = output[-1]
+    probability = softmax(useful, -1)
+    choice = torch.multinomial(probability, num_samples=1).item()
+    return vocab[choice]
+
+
+def infer():
+    checkpoint_dir = Path("checkpoints")
+    data_path = Path("../ch2/tokenized_tiny_story/result.npy")
+    data = np.load(data_path, mmap_mode="r")
+    ckpt_path = checkpoint_dir/"1000.ckpt"
+    load_checkpoint(ckpt_path, model, optimizer)
+    batch, target = get_batch(data, batch_size=1, context_length=CONTEXT_LENGTH, device="mps")
+
+    output = model.forward(batch.long())
+
+    tokenizer_file_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.json"
+    tokenizer = Tokenizer.from_json(tokenizer_file_path)
+    print(tokenizer.decode(batch[0].tolist()))
+    print(decode(output[-1], tokenizer.vocab))
+
+
+infer()
