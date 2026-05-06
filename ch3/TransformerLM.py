@@ -27,7 +27,7 @@ class TransformerLM(nn.Module):
         self.embedding_block = Embedding(vocab_size, d_model)
         self.embedding_block.w = nn.Parameter(weights['token_embeddings.weight'])
 
-        self.transformer_blocks: list[TransformerBlock] = list()
+        self.transformer_blocks = nn.ModuleList()
         for i in range(num_layers):
             self.transformer_blocks.append(TransformerBlock(d_model, num_heads, d_ff, context_length, rope_theta, self.extract_weights(weights, i)))
 

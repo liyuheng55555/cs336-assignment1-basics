@@ -1,3 +1,6 @@
+import logging
+from typing import Iterator
+
 from ch2.type_define import Connection, GPT2_PAT
 import regex as re
 
@@ -83,24 +86,27 @@ def bytes_list_to_connections(bytes_list: list[bytes]) -> list[Connection]:
 def chunk_split(
     chunk: str,
     special_tokens: list[str] | None,
-) -> list[str]:
+) -> Iterator[str]:
     contents: list[str]
     if special_tokens is not None:
         special_tokens.sort(key=lambda x: len(x), reverse=True)
         pattern = "|".join(re.escape(token) for token in special_tokens)
         pattern = "(" + pattern + ")"
         contents = [c for c in re.split(pattern, chunk) if c]
+        logging.info("special tokens split")
     else:
         contents = [chunk]
     special_tokens_set: set[str] = (
         set(special_tokens) if special_tokens is not None else set()
     )
-    result = []
+    pattern = re.compile(GPT2_PAT)
+    count = 0
     for content in contents:
         if content not in special_tokens_set:
-            for match in re.finditer(GPT2_PAT, content):
-                word = match.group()
-                result.append(word)
+            for match in pattern.finditer(content):
+                yield match.group()
+                count += 1
+                if count % 65536 == 0:
+                    logging.info(count)
         else:
-            result.append(content)
-    return result
+            yield content

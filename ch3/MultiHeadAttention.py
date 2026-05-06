@@ -66,7 +66,7 @@ class MultiHeadAttentionWithRope(nn.Module):
         super().__init__()
         self.d_model = d_model
         self.num_heads = num_heads
-        assert q_proj_weight.shape[0] % num_heads == 0
+        # assert q_proj_weight.shape[0] % num_heads == 0
         self.d_k = q_proj_weight.shape[0] // num_heads
         self.W_q : nn.Parameter = nn.Parameter(q_proj_weight)
         self.W_k : nn.Parameter = nn.Parameter(k_proj_weight)

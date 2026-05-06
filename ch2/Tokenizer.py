@@ -1,6 +1,11 @@
 import json
 import codecs
 import logging
+import os
+from pathlib import Path
+
+import numpy as np
+import numpy.typing as npt
 from collections import deque
 from multiprocessing import Process
 from multiprocessing import Queue
@@ -16,6 +21,7 @@ from ch2.utils import (
 
 
 class Tokenizer:
+
 
     def __init__(
         self,
@@ -34,6 +40,7 @@ class Tokenizer:
         self.special_tokens_set: set[str] = (
             set(special_tokens) if special_tokens is not None else set()
         )
+        self.logger = logging.getLogger("Tokenizer")
 
     @classmethod
     def from_json(cls, json_filepath: str):
@@ -136,6 +143,70 @@ class Tokenizer:
         # return self.encode_parallel(text)
 
 
+    def encode_to_file(self, text: str, dir: Path) -> None:
+        dir.mkdir(exist_ok=True)
+        words: Iterable[str] = chunk_split(
+            text, special_tokens=self.special_tokens
+        )
+        buffer: list[int] = []
+        id = 0
+        token_count = 0
+        shard_paths = []
+        for word in words:
+            if word not in self.special_tokens_set:
+                token_list: TokenList = bytes_to_bytes_list(
+                    word.encode("utf-8")
+                )
+                while True:
+                    connections: list[Connection] = bytes_list_to_connections(
+                        token_list
+                    )
+                    chosen_merge_rule = None
+                    min_index = self.MERGE_RULE_NOT_FOUND
+                    for connection in connections:
+                        if connection in self.merge_rules_index:
+                            if self.merge_rules_index[connection] < min_index:
+                                min_index = self.merge_rules_index[connection]
+                                chosen_merge_rule = connection
+                    if min_index != self.MERGE_RULE_NOT_FOUND:
+                        token_list = merge_by_one_rule(
+                            token_list, chosen_merge_rule
+                        )
+                    else:
+                        break
+                for token in token_list:
+                    buffer.append(self.reverse_vocab[token])
+            else:
+                buffer.append(self.reverse_vocab[word.encode("utf-8")])
+            if len(buffer) >= 8*1024*1024:
+                path = dir / f"{id:06d}.npy"
+                shard_paths.append(path)
+                np.save(path, np.array(buffer, dtype=np.uint16))
+                id += 1
+                token_count += len(buffer)
+                buffer = []
+                logging.info(id)
+        path = dir / f"{id:06d}.npy"
+        shard_paths.append(path)
+        np.save(path, np.array(buffer, dtype=np.uint16))
+        id += 1
+        token_count += len(buffer)
+
+        final = np.lib.format.open_memmap(
+            dir/"result.npy",
+            mode="w+",
+            dtype=np.uint16,
+            shape=(token_count,),
+        )
+        offset = 0
+        for p in shard_paths:
+            x = np.load(p, mmap_mode="r")
+            n = len(x)
+            final[offset:offset+n] = x
+            offset += n
+        final.flush()
+
+
     def encode_iterable(self, iterable: Iterable[str]) -> Iterator[int]:
         for text in iterable:
             for code in self.encode(text):
@@ -144,9 +215,24 @@ class Tokenizer:
     def encode_file(self, input_path: str)  -> Iterator[int]:
         pass
 
+    @staticmethod
+    def save_encoded_ids(
+        token_ids: list[int],
+        output_path: str,
+        dtype: np.dtype = np.uint16,
+    ) -> None:
+        arr = np.asarray(token_ids, dtype=dtype)
+        np.save(output_path, arr)
+
+    @staticmethod
+    def load_encoded_ids(
+        input_path: str,
+        mmap_mode: str | None = None,
+    ) -> npt.NDArray:
+        return np.load(input_path, mmap_mode=mmap_mode)
+
     def decode(self, ids: Iterable[int]) -> str:
         buf = bytearray()
         for i in ids:
             buf.extend(self.vocab[i])
         return bytes(buf).decode("utf-8", errors="replace")
-

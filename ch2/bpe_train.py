@@ -327,8 +327,8 @@ if __name__ == "__main__":
         level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
-    input_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/owt_train.txt"
-    vocab_size = 32000
+    input_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt"
+    vocab_size = 10000
 
     main_start = perf_counter()
     # 测试缓存功能 - 使用小数据集
