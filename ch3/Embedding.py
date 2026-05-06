@@ -3,9 +3,9 @@ import torch
 from torch import nn
 
 class Embedding(nn.Module):
-    def __init__(self, num_embeddings: int, embedding_dim: int):
+    def __init__(self, vocab_size: int, d_model: int):
         super().__init__()
-        self.w: nn.Parameter = nn.Parameter(torch.rand(num_embeddings, embedding_dim))
+        self.w: nn.Parameter = nn.Parameter(torch.empty(vocab_size, d_model).normal_(mean=0.0, std=0.02))
 
     def forward(self, token_ids: torch.Tensor) -> torch.Tensor:
         return self.w[token_ids]

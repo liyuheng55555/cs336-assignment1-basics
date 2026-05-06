@@ -33,8 +33,7 @@ class TransformerLM(nn.Module):
 
         self.norm = RMSNorm1(d_model, weights['ln_final.weight'])
 
-        self.linear = Linear(d_model, vocab_size)
-        self.linear.w = nn.Parameter(weights['lm_head.weight'])
+        self.linear = Linear(d_model, vocab_size, weights=weights['lm_head.weight'])
 
 
     def forward(self, in_indices: Int[Tensor, " batch_size sequence_length"]):

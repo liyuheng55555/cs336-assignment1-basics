@@ -42,20 +42,20 @@ logging.basicConfig(
 
 weights = {
     'token_embeddings.weight': torch.empty(VOCAB_SIZE, D_MODEL).normal_(mean=0.0, std=0.02),
-    'ln_final.weight': torch.rand(D_MODEL),
-    'lm_head.weight': torch.rand(VOCAB_SIZE, D_MODEL),
+    'ln_final.weight': torch.ones(D_MODEL),
+    'lm_head.weight': torch.empty(VOCAB_SIZE, D_MODEL).normal_(mean=0, std=0.02),
 }
 for i in range(NUM_LAYERS):
     layer_weights = {
-        f'layers.{i}.attn.q_proj.weight': torch.rand(D_MODEL, D_MODEL),
-        f'layers.{i}.attn.k_proj.weight': torch.rand(D_MODEL, D_MODEL),
-        f'layers.{i}.attn.v_proj.weight': torch.rand(D_MODEL, D_MODEL),
-        f'layers.{i}.attn.output_proj.weight': torch.rand(D_MODEL, D_MODEL),
-        f'layers.{i}.ffn.w1.weight': torch.rand(D_FF, D_MODEL),
-        f'layers.{i}.ffn.w2.weight': torch.rand(D_MODEL, D_FF),
-        f'layers.{i}.ffn.w3.weight': torch.rand(D_FF, D_MODEL),
-        f'layers.{i}.ln1.weight': torch.rand(D_MODEL),
-        f'layers.{i}.ln2.weight': torch.rand(D_MODEL),
+        f'layers.{i}.attn.q_proj.weight': torch.empty(D_MODEL, D_MODEL).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.attn.k_proj.weight': torch.empty(D_MODEL, D_MODEL).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.attn.v_proj.weight': torch.empty(D_MODEL, D_MODEL).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.attn.output_proj.weight': torch.empty(D_MODEL, D_MODEL).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.ffn.w1.weight': torch.empty(D_FF, D_MODEL).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.ffn.w2.weight': torch.empty(D_MODEL, D_FF).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.ffn.w3.weight': torch.empty(D_FF, D_MODEL).normal_(mean=0.0, std=0.02),
+        f'layers.{i}.ln1.weight': torch.ones(D_MODEL),
+        f'layers.{i}.ln2.weight': torch.ones(D_MODEL),
     }
     weights |= layer_weights
 
@@ -88,12 +88,13 @@ data_path = Path("../ch2/tokenized_tiny_story/result.npy")
 data = np.load(data_path, mmap_mode="r")
 checkpoint_dir = Path("checkpoints")
 
+# batch, target = get_batch(data, batch_size=32, context_length=CONTEXT_LENGTH, device="cpu")
 for iteration in range(TOTAL_STEPS):
     batch, target = get_batch(data, batch_size=32, context_length=CONTEXT_LENGTH, device="cpu")
     result = model.forward(batch.long())
-    result = einops.rearrange(result, "batch context_length vocab_size -> context_length batch vocab_size")
-    target = einops.rearrange(target, "batch context_length -> context_length batch")
-    entropy: torch.Tensor = cross_entropy(result, target)
+    result = einops.rearrange(result, "batch context_length vocab_size -> (batch context_length) vocab_size")
+    target1 = einops.rearrange(target, "batch context_length -> (batch context_length)")
+    entropy: torch.Tensor = cross_entropy(result, target1)
     entropy.backward()
     gradient_clipping(model.parameters(), L2_NORM)
 
@@ -105,7 +106,7 @@ for iteration in range(TOTAL_STEPS):
         ckpt_path = checkpoint_dir/f"{iteration}.ckpt"
         save_checkpoint(model, optimizer, iteration, ckpt_path)
         logging.info(f"checkpoint {ckpt_path.__str__()} saved")
-    logging.info(f"iteration: {iteration:06d}loss: {entropy.int()}")
+    logging.info(f"iteration: {iteration:06d}  loss: {entropy.item()}")
 
 
 save_checkpoint(model, optimizer, TOTAL_STEPS, checkpoint_dir/f"{TOTAL_STEPS}.ckpt")

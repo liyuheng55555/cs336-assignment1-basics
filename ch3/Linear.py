@@ -7,7 +7,7 @@ from einops import rearrange, einsum
 
 
 class Linear(nn.Module):
-    def __init__(self, in_features: int, out_features: int, weights: torch.Tensor, device=None, dtype=None):
+    def __init__(self, in_features: int, out_features: int, weights: torch.Tensor = None, device=None, dtype=None):
         super().__init__()
         std = math.sqrt(2/(in_features + out_features))
         self.w = nn.Parameter(weights)
