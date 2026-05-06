@@ -129,14 +129,28 @@ def infer():
     data = np.load(data_path, mmap_mode="r")
     ckpt_path = checkpoint_dir/"1000.ckpt"
     load_checkpoint(ckpt_path, model, optimizer)
-    batch, target = get_batch(data, batch_size=1, context_length=CONTEXT_LENGTH, device="mps")
-
-    output = model.forward(batch.long())
+    batch, _ = get_batch(data, batch_size=1, context_length=CONTEXT_LENGTH, device="mps")
 
     tokenizer_file_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.json"
     tokenizer = Tokenizer.from_json(tokenizer_file_path)
-    print(tokenizer.decode(batch[0].tolist()))
-    print(decode(output[-1], tokenizer.vocab))
+    seed_ids = batch[0].tolist()
+    print(tokenizer.decode(seed_ids), end="", flush=True)
+
+    print("开始推理！")
+
+    model.eval()
+    context = batch.long()
+    with torch.no_grad():
+        try:
+            while True:
+                output = model.forward(context)
+                next_logits = output[0, -1]
+                probability = softmax(next_logits, -1, temp=0.2)
+                next_id = torch.multinomial(probability, num_samples=1)
+                context = torch.cat([context, next_id.view(1, 1)], dim=1)[:, -CONTEXT_LENGTH:]
+                print(tokenizer.decode([next_id.item()]), end="", flush=True)
+        except KeyboardInterrupt:
+            print()
 
 
 infer()
