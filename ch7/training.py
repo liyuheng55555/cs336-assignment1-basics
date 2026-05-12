@@ -21,6 +21,7 @@ from ch5.get_batch import get_batch
 ############## Settings ##############
 
 TOTAL_STEPS = 5001
+BATCH_SIZE = 64
 
 # Model Size
 
@@ -107,7 +108,7 @@ optimizer = AdamW(
 
 def train(checkpoint_path: Path = None):
     logging.info("training start")
-    data_path = Path("../ch2/tokenized_tiny_story/result.npy")
+    data_path = Path("/data/cs336/data/tinystories_train_tokenized/result.npy")
     data = np.load(data_path, mmap_mode="r")
     checkpoint_dir = Path("checkpoints")
 
@@ -116,7 +117,7 @@ def train(checkpoint_path: Path = None):
         start = load_checkpoint(checkpoint_path, model, optimizer)
 
     def train_loop(iteration:int):
-        batch, target = get_batch(data, batch_size=32, context_length=CONTEXT_LENGTH, device="mps")
+        batch, target = get_batch(data, batch_size=BATCH_SIZE, context_length=CONTEXT_LENGTH, device=DEVICE)
 
         if PROFILE:
             BACKEND.synchronize()
@@ -197,7 +198,7 @@ def infer():
     data = np.load(data_path, mmap_mode="r")
     ckpt_path = checkpoint_dir/"2000.ckpt"
     load_checkpoint(ckpt_path, model, optimizer)
-    batch, _ = get_batch(data, batch_size=1, context_length=CONTEXT_LENGTH, device="mps")
+    batch, _ = get_batch(data, batch_size=1, context_length=CONTEXT_LENGTH, device=DEVICE)
 
     tokenizer_file_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.json"
     tokenizer = Tokenizer.from_json(tokenizer_file_path)
@@ -227,5 +228,6 @@ def infer():
 
 # train(checkpoint_path=Path("checkpoints/1000.ckpt"))
 # infer()
-# train()
-accounting()
+if __name__ == "__main__":
+    train()
+# accounting()
