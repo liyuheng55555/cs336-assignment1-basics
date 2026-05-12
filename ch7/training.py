@@ -5,6 +5,7 @@ from pathlib import Path
 import einops
 import torch
 import numpy as np
+from ch3.transformer_accounting import calculate_parameters
 from jaxtyping import Float
 from torch import Tensor
 
@@ -40,13 +41,16 @@ WEIGHT_DECAY = 0.01
 # GRADIENT_CLIPPING
 L2_NORM = 1.0
 
-DEVICE = torch.device("mps")
+DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("mps")
 
 DATA_TYPE = torch.bfloat16
 
 PROFILE = False
+BACKEND = None
+
 if PROFILE:
     logging.warning("Profiling is on")
+    BACKEND = torch.cuda if torch.cuda.is_available() else torch.mps
 
 torch.manual_seed(69)
 
@@ -115,40 +119,40 @@ def train(checkpoint_path: Path = None):
         batch, target = get_batch(data, batch_size=32, context_length=CONTEXT_LENGTH, device="mps")
 
         if PROFILE:
-            torch.mps.synchronize()
+            BACKEND.synchronize()
             t_forward = time.perf_counter()
         result = model.forward(batch.long())
         if PROFILE:
-            torch.mps.synchronize()
+            BACKEND.synchronize()
             logging.info(f"forward: {time.perf_counter() - t_forward:.4f}s")
 
         # entropy
         if PROFILE:
-            torch.mps.synchronize()
+            BACKEND.synchronize()
             t_entropy = time.perf_counter()
         result = einops.rearrange(result, "batch context_length vocab_size -> (batch context_length) vocab_size")
         target1 = einops.rearrange(target, "batch context_length -> (batch context_length)")
         entropy: torch.Tensor = cross_entropy(result, target1)
         if PROFILE:
-            torch.mps.synchronize()
+            BACKEND.synchronize()
             logging.info(f"cross entropy: {time.perf_counter() - t_entropy:.4f}s")
 
         if PROFILE:
-            torch.mps.synchronize()
+            BACKEND.synchronize()
             t_backward = time.perf_counter()
         entropy.backward()
         if PROFILE:
-            torch.mps.synchronize()
+            BACKEND.synchronize()
             logging.info(f"backward: {time.perf_counter() - t_backward:.4f}s")
 
         gradient_clipping(model.parameters(), L2_NORM)
 
         if PROFILE:
-            torch.mps.synchronize()
+            BACKEND.synchronize()
             t_optimize = time.perf_counter()
         optimizer.step()
         if PROFILE:
-            torch.mps.synchronize()
+            BACKEND.synchronize()
             logging.info(f"optimize: {time.perf_counter() - t_optimize:.4f}s")
 
         optimizer.zero_grad()
@@ -167,7 +171,7 @@ def train(checkpoint_path: Path = None):
         train_loop(iteration)
     logging.info("warm up finished")
 
-    # with torch.mps.profiler.profile(
+    # with BACKEND.profiler.profile(
     #         mode="interval,event",
     #         wait_until_completed=False,
     # ):
@@ -175,7 +179,7 @@ def train(checkpoint_path: Path = None):
     for iteration in range(start+3, TOTAL_STEPS):
         train_loop(iteration)
 
-    torch.mps.synchronize()
+    BACKEND.synchronize()
 
     # save_checkpoint(model, optimizer, TOTAL_STEPS, checkpoint_dir/f"{TOTAL_STEPS}.ckpt")
 
@@ -217,6 +221,11 @@ def infer():
             print()
 
 
+# def accounting():
+#     print(calculate_parameters(VOCAB_SIZE, CONTEXT_LENGTH, NUM_LAYERS, D_MODEL, NUM_HEADS, D_FF))
+
+
 # train(checkpoint_path=Path("checkpoints/1000.ckpt"))
 # infer()
-train()
+# train()
+accounting()
