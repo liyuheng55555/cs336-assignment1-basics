@@ -93,7 +93,7 @@ def chunk_split(
         pattern = "|".join(re.escape(token) for token in special_tokens)
         pattern = "(" + pattern + ")"
         contents = [c for c in re.split(pattern, chunk) if c]
-        logging.info("special tokens split")
+        # logging.info("special tokens split")
     else:
         contents = [chunk]
     special_tokens_set: set[str] = (

@@ -140,7 +140,7 @@ def pre_tokenize_worker(
 
 
 def pre_tokenize(
-    input_path: str, special_tokens: list[str], concurrency: int = 6
+    input_path: str, special_tokens: list[str], concurrency: int = 8
 ) -> list[tuple[TokenList, Num]]:
     queue: Queue = Queue()
     workers: deque[Process] = deque()
@@ -327,8 +327,8 @@ if __name__ == "__main__":
         level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
     )
 
-    input_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.txt"
-    vocab_size = 10000
+    input_path = "/data/cs336/data/owt_train.txt"
+    vocab_size = 32000
 
     main_start = perf_counter()
     # 测试缓存功能 - 使用小数据集
