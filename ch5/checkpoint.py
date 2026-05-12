@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import BinaryIO, IO
 
@@ -23,8 +24,10 @@ def load_checkpoint(
         model: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
 ):
+    logging.info("loading checkpoint...")
     data = torch.load(src)
     assert isinstance(data, dict)
     model.load_state_dict(data['model'])
     optimizer.load_state_dict(data['optimizer'])
+    logging.info("checkpoint loaded")
     return data['iteration']

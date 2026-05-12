@@ -41,9 +41,14 @@ class AdamW(torch.optim.Optimizer):
                     continue
 
                 state = self.state[p]
-                t = state.get("t", 1)
-                m: torch.Tensor = state.get("m", torch.zeros(p.shape, device=group["device"]))
-                v: torch.Tensor = state.get("v", torch.zeros(p.shape, device=group["device"]))
+                if len(state) == 0:
+                    state["t"] = 1
+                    state["m"] = torch.zeros_like(p, dtype=torch.float32)
+                    state["v"] = torch.zeros_like(p, dtype=torch.float32)
+
+                t = state.get("t")
+                m: torch.Tensor = state.get("m")
+                v: torch.Tensor = state.get("v")
                 g = p.grad.data
 
                 p.data -= lr * weight_decay * p.data
