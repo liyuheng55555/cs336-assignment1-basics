@@ -5,6 +5,7 @@ from collections.abc import Callable, Iterable
 from typing import Optional
 
 from ch3.transformer_accounting import calculate_parameters
+from ch4.lr_cosine_schedule import lr_cosine_schedule
 
 
 class AdamW(torch.optim.Optimizer):
@@ -16,6 +17,7 @@ class AdamW(torch.optim.Optimizer):
             betas: tuple[float, float],
             eps: float,
             device: torch.device,
+            cosine_cycle_iters: int = None
     ):
         defaults = {
             "lr": lr,
@@ -23,6 +25,7 @@ class AdamW(torch.optim.Optimizer):
             "betas": betas,
             "eps": eps,
             "device": device,
+            "cosine_cycle_iters": cosine_cycle_iters
         }
         super().__init__(params, defaults)
 
@@ -34,6 +37,7 @@ class AdamW(torch.optim.Optimizer):
             weight_decay = group["weight_decay"]
             b1, b2 = group["betas"]
             eps = group["eps"]
+            cosine_cycle_iters = group["cosine_cycle_iters"]
 
             for p in group["params"]:
                 assert isinstance(p, torch.Tensor)
@@ -50,6 +54,9 @@ class AdamW(torch.optim.Optimizer):
                 m: torch.Tensor = state.get("m")
                 v: torch.Tensor = state.get("v")
                 g = p.grad.data
+
+                if cosine_cycle_iters is not None:
+                    lr = lr_cosine_schedule(t, lr, lr/2, 50, cosine_cycle_iters)
 
                 p.data -= lr * weight_decay * p.data
 

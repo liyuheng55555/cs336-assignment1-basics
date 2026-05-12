@@ -21,7 +21,7 @@ from ch5.get_batch import get_batch
 ############## Settings ##############
 
 TOTAL_STEPS = 5001
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 
 # Model Size
 
@@ -41,6 +41,9 @@ WEIGHT_DECAY = 0.01
 
 # GRADIENT_CLIPPING
 L2_NORM = 1.0
+
+# LR_SCHEDULE
+COSINE_CYCLE_ITERS = TOTAL_STEPS
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("mps")
 
@@ -81,6 +84,8 @@ for i in range(NUM_LAYERS):
     }
     weights |= layer_weights
 
+
+
 logging.info("Init model...")
 model = TransformerLM(
     VOCAB_SIZE,
@@ -100,7 +105,8 @@ optimizer = AdamW(
     betas=BETAS,
     weight_decay=WEIGHT_DECAY,
     eps=EPS,
-    device=DEVICE
+    device=DEVICE,
+    cosine_cycle_iters=COSINE_CYCLE_ITERS,
 )
 
 # for param in model.parameters():
@@ -108,7 +114,7 @@ optimizer = AdamW(
 
 def train(checkpoint_path: Path = None):
     logging.info("training start")
-    data_path = Path("/data/cs336/data/tinystories_train_tokenized/result.npy")
+    data_path = Path("../ch2/tokenized_tiny_story/result.npy")
     data = np.load(data_path, mmap_mode="r")
     checkpoint_dir = Path("checkpoints")
 
@@ -222,12 +228,12 @@ def infer():
             print()
 
 
-# def accounting():
-#     print(calculate_parameters(VOCAB_SIZE, CONTEXT_LENGTH, NUM_LAYERS, D_MODEL, NUM_HEADS, D_FF))
+def accounting():
+    print(calculate_parameters(VOCAB_SIZE, CONTEXT_LENGTH, NUM_LAYERS, D_MODEL, NUM_HEADS, D_FF))
 
 
 # train(checkpoint_path=Path("checkpoints/1000.ckpt"))
 # infer()
 if __name__ == "__main__":
-    train()
-# accounting()
+    # train()
+    accounting()
