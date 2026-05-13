@@ -1,6 +1,5 @@
 import math
-
-import torch.optim
+import torch
 from collections.abc import Callable, Iterable
 from typing import Optional
 
@@ -19,6 +18,7 @@ class AdamW(torch.optim.Optimizer):
             device: torch.device,
             cosine_cycle_iters: int = None
     ):
+        self._global_step = 0
         defaults = {
             "lr": lr,
             "weight_decay": weight_decay,
@@ -32,6 +32,8 @@ class AdamW(torch.optim.Optimizer):
 
     def step(self, closure: Optional[Callable] = None):
         loss = None if closure is None else closure()
+        self._global_step += 1
+        current_global_step = self._global_step
         for group in self.param_groups:
             lr = group["lr"]
             weight_decay = group["weight_decay"]
@@ -55,12 +57,13 @@ class AdamW(torch.optim.Optimizer):
                 v: torch.Tensor = state.get("v")
                 g = p.grad.data
 
+                scheduled_lr = lr
                 if cosine_cycle_iters is not None:
-                    lr = lr_cosine_schedule(t, lr, lr/2, 50, cosine_cycle_iters)
+                    scheduled_lr = lr_cosine_schedule(current_global_step, lr, lr/10, cosine_cycle_iters // 20, cosine_cycle_iters)
 
-                p.data -= lr * weight_decay * p.data
+                p.data -= scheduled_lr * weight_decay * p.data
 
-                lr_t = lr * math.sqrt(1 - b2 ** t) / (1 - b1 ** t)
+                lr_t = scheduled_lr * math.sqrt(1 - b2 ** t) / (1 - b1 ** t)
 
                 m = b1 * m + (1 - b1) * g
                 v = b2 * v + (1 - b2) * (g ** 2)
