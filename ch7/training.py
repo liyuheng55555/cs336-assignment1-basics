@@ -1,6 +1,8 @@
 import logging
 import time
+import csv
 from pathlib import Path
+from datetime import datetime
 
 import einops
 import torch
@@ -20,8 +22,8 @@ from ch5.get_batch import get_batch
 
 ############## Settings ##############
 
-TOTAL_STEPS = 5001
-BATCH_SIZE = 32
+TOTAL_STEPS = 5000
+BATCH_SIZE = 64
 
 # Model Size
 
@@ -34,7 +36,7 @@ NUM_HEADS = 16
 NUM_LAYERS = 4
 
 # ADAMW_PARAMS
-LEARNING_RATE = 3e-4
+LEARNING_RATE = 12e-4
 BETAS = (0.9, 0.999)
 EPS = 1e-8
 WEIGHT_DECAY = 0.01
@@ -46,15 +48,14 @@ L2_NORM = 1.0
 COSINE_CYCLE_ITERS = TOTAL_STEPS
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("mps")
+BACKEND = torch.cuda if torch.cuda.is_available() else torch.mps
 
 DATA_TYPE = torch.bfloat16
 
 PROFILE = False
-BACKEND = None
 
 if PROFILE:
     logging.warning("Profiling is on")
-    BACKEND = torch.cuda if torch.cuda.is_available() else torch.mps
 
 torch.manual_seed(69)
 
@@ -114,15 +115,51 @@ optimizer = AdamW(
 
 def train(checkpoint_path: Path = None):
     logging.info("training start")
-    data_path = Path("../ch2/tokenized_tiny_story/result.npy")
+    data_path = Path("/data/cs336/data/tinystories_train_tokenized/result.npy")
     data = np.load(data_path, mmap_mode="r")
-    checkpoint_dir = Path("checkpoints")
 
-    start = 0
+    train_start_time = datetime.now()
+    run_id = train_start_time.strftime("%Y%m%d_%H%M%S")
+    run_dir = Path("training_runs") / f"run_{run_id}"
+    checkpoint_dir = run_dir / "checkpoints"
+    checkpoint_dir.mkdir(parents=True, exist_ok=False)
+    csv_file_path = run_dir / f"train_log_{run_id}.csv"
+    logging.info(f"training run dir: {run_dir}")
+    csv_file = open(csv_file_path, "w", newline="", encoding="utf-8")
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow(["record_type", "timestamp", "key", "value", "step", "loss"])
+
+    hyperparameters = {
+        "total_steps": TOTAL_STEPS,
+        "batch_size": BATCH_SIZE,
+        "vocab_size": VOCAB_SIZE,
+        "context_length": CONTEXT_LENGTH,
+        "d_model": D_MODEL,
+        "d_ff": D_FF,
+        "rope_theta": ROPE_THETA,
+        "num_heads": NUM_HEADS,
+        "num_layers": NUM_LAYERS,
+        "learning_rate": LEARNING_RATE,
+        "betas": BETAS,
+        "eps": EPS,
+        "weight_decay": WEIGHT_DECAY,
+        "l2_norm": L2_NORM,
+        "cosine_cycle_iters": COSINE_CYCLE_ITERS,
+        "device": str(DEVICE),
+        "data_type": str(DATA_TYPE),
+    }
+    for key, value in hyperparameters.items():
+        csv_writer.writerow(["hyperparameter", train_start_time.isoformat(), key, value, "", ""])
+    csv_file.flush()
+    logging.info(f"training csv log: {csv_file_path}")
+
+    start_iteration = 0
     if checkpoint_path is not None:
-        start = load_checkpoint(checkpoint_path, model, optimizer)
+        start_iteration = load_checkpoint(checkpoint_path, model, optimizer)
 
-    def train_loop(iteration:int):
+    start_time = time.perf_counter()
+    loss_sum = 0
+    for iteration in range(start_iteration, TOTAL_STEPS):
         batch, target = get_batch(data, batch_size=BATCH_SIZE, context_length=CONTEXT_LENGTH, device=DEVICE)
 
         if PROFILE:
@@ -163,32 +200,29 @@ def train(checkpoint_path: Path = None):
             logging.info(f"optimize: {time.perf_counter() - t_optimize:.4f}s")
 
         optimizer.zero_grad()
-
-        if iteration % 500 == 0:
+        if iteration % 1000 == 0:
+            BACKEND.synchronize()
             logging.info("saving checkpoint...")
             ckpt_path = checkpoint_dir/f"{iteration}.ckpt"
             save_checkpoint(model, optimizer, iteration, ckpt_path)
             logging.info(f"checkpoint {ckpt_path.__str__()} saved")
+        if iteration % 100 == 0:
+            BACKEND.synchronize()
+            t = time.perf_counter() - start_time
+            logging.info(f"last 100 iterations:  {t:.4f}s  average_loss: {loss_sum / 10:.4f}")
+            loss_sum = 0
+            start_time = time.perf_counter()
         if iteration % 10 == 0:
             logging.info(f"iteration: {iteration:06d}  loss: {entropy.item()}")
+            loss_sum += entropy.item()
+            csv_writer.writerow(["metric", datetime.now().isoformat(), "", "", iteration, entropy.item()])
+            csv_file.flush()
 
-    # warm up
-    logging.info("warm up...")
-    for iteration in range(start+1, start+3):
-        train_loop(iteration)
-    logging.info("warm up finished")
 
-    # with BACKEND.profiler.profile(
-    #         mode="interval,event",
-    #         wait_until_completed=False,
-    # ):
-    logging.info("profile start")
-    for iteration in range(start+3, TOTAL_STEPS):
-        train_loop(iteration)
+    # BACKEND.synchronize()
+    csv_file.close()
 
-    BACKEND.synchronize()
-
-    # save_checkpoint(model, optimizer, TOTAL_STEPS, checkpoint_dir/f"{TOTAL_STEPS}.ckpt")
+    save_checkpoint(model, optimizer, TOTAL_STEPS, checkpoint_dir/f"{TOTAL_STEPS}.ckpt")
 
 
 def decode(output: Float[Tensor, "context_length vocab_size"], vocab: list[bytes]):
@@ -199,14 +233,14 @@ def decode(output: Float[Tensor, "context_length vocab_size"], vocab: list[bytes
 
 
 def infer():
-    checkpoint_dir = Path("checkpoints")
-    data_path = Path("../ch2/tokenized_tiny_story/result.npy")
+    checkpoint_dir = Path("/data/cs336/cs336-assignment1-basics/training_runs/run_20260513_163104_batch64_3090/checkpoints")
+    data_path = Path("/data/cs336/data/tinystories_train_tokenized/result.npy")
     data = np.load(data_path, mmap_mode="r")
-    ckpt_path = checkpoint_dir/"2000.ckpt"
+    ckpt_path = checkpoint_dir/"5000.ckpt"
     load_checkpoint(ckpt_path, model, optimizer)
     batch, _ = get_batch(data, batch_size=1, context_length=CONTEXT_LENGTH, device=DEVICE)
 
-    tokenizer_file_path = "/Users/liyuheng/Documents/cs336/cs336-assignment1-basics/data/TinyStoriesV2-GPT4-train.json"
+    tokenizer_file_path = "/data/cs336/data/TinyStoriesV2-GPT4-train.json"
     tokenizer = Tokenizer.from_json(tokenizer_file_path)
     seed_ids = batch[0].tolist()
     print(tokenizer.decode(seed_ids), end="", flush=True)
@@ -229,11 +263,13 @@ def infer():
 
 
 def accounting():
-    print(calculate_parameters(VOCAB_SIZE, CONTEXT_LENGTH, NUM_LAYERS, D_MODEL, NUM_HEADS, D_FF))
+    calculate_parameters(VOCAB_SIZE, CONTEXT_LENGTH, NUM_LAYERS, D_MODEL, NUM_HEADS, D_FF)
 
 
 # train(checkpoint_path=Path("checkpoints/1000.ckpt"))
 # infer()
 if __name__ == "__main__":
-    # train()
     accounting()
+    # train()
+    infer()
+    
